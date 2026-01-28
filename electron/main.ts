@@ -1,128 +1,115 @@
 import 'dotenv/config'
-import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron'
-import { createRequire } from 'node:module'
+import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, Event } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-
-// Ai
 import OpenAI from 'openai'
+
+let win: BrowserWindow | null = null
+let tray: Tray | null = null
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// ---------------- AI SETUP ----------------
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
-});
+})
 
-// Handle AI explain request
 ipcMain.handle('ai:explain', async (_event, text: string) => {
-  if(!text?.trim())
-    return 'No input provided.'
+  if (!text?.trim()) return 'No input provided.'
 
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
-        {
-          role: 'system',
-          content: 'You are an expert AI assistant that explains code and errors clearly and concisely.'
-        },
-        {
-          role: 'user',
-          content: text
-        }
+        { role: 'system', content: 'You are an expert AI assistant that explains code and errors clearly and concisely.' },
+        { role: 'user', content: text }
       ],
       temperature: 0.3
     })
 
     return response.choices[0].message.content ?? 'No explanation provided.'
   } catch (err: any) {
-    if (err?.code === 'insufficient_quota')
+    if (err?.code === 'insufficient_quota') {
       return '⚠️ OpenAI API quota exceeded. Please check your billing settings.'
-
+    }
     return '⚠️ AI service error. Please try again later.'
   }
 })
 
-const require = createRequire(import.meta.url)
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-
-// The built directory structure
-//
-// ├─┬─┬ dist
-// │ │ └── index.html
-// │ │
-// │ ├─┬ dist-electron
-// │ │ ├── main.js
-// │ │ └── preload.mjs
-// │
-process.env.APP_ROOT = path.join(__dirname, '..')
-
-// 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
-export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
-export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
-
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
-
-let win: BrowserWindow | null
-
+// ---------------- WINDOW ----------------
 function createWindow() {
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    icon: path.join(__dirname, '../public/electron-vite.svg'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
-    },
+      preload: path.join(__dirname, 'preload.mjs')
+    }
   })
 
-  // Test active push message to Renderer-process.
-  win.webContents.on('did-finish-load', () => {
-    win?.webContents.send('main-process-message', (new Date).toLocaleString())
+  win.on('close', (event) => {
+    event.preventDefault()
+    win?.hide()
   })
 
-  if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL)
+  if (process.env.VITE_DEV_SERVER_URL) {
+    win.loadURL(process.env.VITE_DEV_SERVER_URL)
   } else {
-    // win.loadFile('dist/index.html')
-    win.loadFile(path.join(RENDERER_DIST, 'index.html'))
+    win.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 }
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-    win = null
-  }
-})
+// ---------------- TRAY ----------------
+function createTray() {
+  const iconPath = path.join(__dirname, '../public/electron-vite.svg')
+  tray = new Tray(iconPath)
 
-app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow()
-  }
-})
+  const trayMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show AI Sidekick',
+      click: () => {
+        win?.show()
+        win?.focus()
+      }
+    },
+    {
+      label: 'Explain Clipboard',
+      click: () => {
+        win?.show()
+        win?.focus()
+        win?.webContents.send('explain-clipboard')
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => app.quit()
+    }
+  ])
 
-// Unregister all shortcuts when quitting
-app.on('will-quit', () => {
-  globalShortcut.unregisterAll()
-})
+  tray.setToolTip('AI Sidekick')
+  tray.setContextMenu(trayMenu)
+}
 
+// ---------------- APP LIFECYCLE ----------------
 app.whenReady().then(() => {
   createWindow()
+  createTray()
 
-  // Register global shortcut to trigger "explain clipboard" action
   const success = globalShortcut.register('CommandOrControl+Alt+E', () => {
-    if(!win) return
-  
-    if(win.isMinimized()) win.restore()
-    win.show()
-    win.focus()
-
-    win.webContents.send('trigger-explain-clipboard')
+    win?.show()
+    win?.focus()
+    win?.webContents.send('explain-clipboard')
   })
 
-  if(!success) 
-    console.error('Failed to register global shortcut.')
-  else
-    console.log('Global shortcut registered successfully.')
+  console.log(success
+    ? '✅ Global shortcut registered'
+    : '❌ Failed to register global shortcut'
+  )
+})
+
+app.on('window-all-closed', (event: Event) => {
+  event.preventDefault()
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
 })
