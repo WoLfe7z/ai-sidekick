@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/electron-vite.animate.svg'
 import './App.css'
@@ -8,9 +8,32 @@ function App() {
   const [output, setOutput] = useState("")
   const [loading, setLoading] = useState(false)
 
-  const handleExplain = async () => {
-    if (!input.trim()) {
-      setOutput("Please enter some text to explain.")
+  // Function to read from clipboard and set input
+  const handleExplainClipboard = async () => {
+    try {
+      const clipboardText = await navigator.clipboard.readText()
+
+      if(!clipboardText.trim()) {
+        setOutput("Clipboard is empty.")
+        return
+      }
+
+      setInput("")    // Clear previous input
+      setTimeout(() => {
+        setInput(clipboardText)
+      }, 0) // Ensure state update
+      
+      await handleExplain(clipboardText)
+    } catch (err) {
+      setOutput("Failed to read clipboard: " + (err as Error).message)
+    }
+  }
+
+  const handleExplain = async (overrideText?: string) => {
+    const textToExplain = overrideText ?? input
+
+    if (!textToExplain.trim()) {
+      setOutput("No text available to explain from clipboard.")
       return
     }
 
@@ -19,14 +42,29 @@ function App() {
 
     try {
       // @ts-ignore
-      const result = await window.ai.explainText(input)
+      const result = await window.ai.explainText(textToExplain)
       setOutput(result)
-    } catch (err) {
+    }
+    catch (err) {
       setOutput("Error occurred: " + (err as Error).message)
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    const handleHotKey = async () => {
+      await handleExplainClipboard()
+    }
+
+    // @ts-ignore
+    window.ipcRenderer.on('trigger-explain-clipboard', handleHotKey)
+
+    return () => {
+      // @ts-ignore
+      window.ipcRenderer.off('trigger-explain-clipboard', handleHotKey)
+    }
+  }, [])
 
   return (
     <>
@@ -44,8 +82,12 @@ function App() {
         onChange={(e) => setInput(e.target.value)}
       />
       <div className="card">
-        <button onClick={handleExplain} disabled={loading}>
+        <button onClick={() => handleExplain()} disabled={loading}>
           {loading ? "Loading..." : "Explain Text"}
+        </button>
+
+        <button onClick={handleExplainClipboard}>
+          Explain Clipboard
         </button>
       </div>
       <div className="output">
