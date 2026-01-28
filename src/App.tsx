@@ -28,6 +28,23 @@ function App() {
     }
   }
 
+  // Function to read from clipboard and set input
+  const handleExplainClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+
+      if (!text.trim()) {
+        setOutput("Clipboard is empty.")
+        return
+      }
+
+      setInput(text)
+      setOutput("Clipboard text loaded. Click Explain to continue.")
+    } catch (err) {
+      setOutput("Could not read clipboard.")
+    }
+  }
+
   return (
     <>
       <div>
@@ -46,6 +63,10 @@ function App() {
       <div className="card">
         <button onClick={handleExplain} disabled={loading}>
           {loading ? "Loading..." : "Explain Text"}
+        </button>
+
+        <button onClick={handleExplainClipboard}>
+          Explain Clipboard
         </button>
       </div>
       <div className="output">
