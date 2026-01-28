@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -102,4 +102,27 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(createWindow)
+// Unregister all shortcuts when quitting
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
+})
+
+app.whenReady().then(() => {
+  createWindow()
+
+  // Register global shortcut to trigger "explain clipboard" action
+  const success = globalShortcut.register('CommandOrControl+Alt+E', () => {
+    if(!win) return
+  
+    if(win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+
+    win.webContents.send('trigger-explain-clipboard')
+  })
+
+  if(!success) 
+    console.error('Failed to register global shortcut.')
+  else
+    console.log('Global shortcut registered successfully.')
+})

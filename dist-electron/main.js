@@ -2,7 +2,7 @@ import require$$0 from "fs";
 import require$$1 from "path";
 import require$$2 from "os";
 import require$$3 from "crypto";
-import { ipcMain, app, BrowserWindow } from "electron";
+import { ipcMain, app, BrowserWindow, globalShortcut } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path$2 from "node:path";
@@ -7018,7 +7018,23 @@ app.on("activate", () => {
     createWindow();
   }
 });
-app.whenReady().then(createWindow);
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
+});
+app.whenReady().then(() => {
+  createWindow();
+  const success = globalShortcut.register("CommandOrControl+Alt+E", () => {
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    win.webContents.send("trigger-explain-clipboard");
+  });
+  if (!success)
+    console.error("Failed to register global shortcut.");
+  else
+    console.log("Global shortcut registered successfully.");
+});
 export {
   MAIN_DIST,
   RENDERER_DIST,

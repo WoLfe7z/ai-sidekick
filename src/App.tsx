@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/electron-vite.animate.svg'
 import './App.css'
@@ -18,7 +18,11 @@ function App() {
         return
       }
 
-      setInput(clipboardText)
+      setInput("")    // Clear previous input
+      setTimeout(() => {
+        setInput(clipboardText)
+      }, 0) // Ensure state update
+      
       await handleExplain(clipboardText)
     } catch (err) {
       setOutput("Failed to read clipboard: " + (err as Error).message)
@@ -47,6 +51,20 @@ function App() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    const handleHotKey = async () => {
+      await handleExplainClipboard()
+    }
+
+    // @ts-ignore
+    window.ipcRenderer.on('trigger-explain-clipboard', handleHotKey)
+
+    return () => {
+      // @ts-ignore
+      window.ipcRenderer.off('trigger-explain-clipboard', handleHotKey)
+    }
+  }, [])
 
   return (
     <>
