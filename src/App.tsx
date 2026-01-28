@@ -8,9 +8,28 @@ function App() {
   const [output, setOutput] = useState("")
   const [loading, setLoading] = useState(false)
 
-  const handleExplain = async () => {
-    if (!input.trim()) {
-      setOutput("Please enter some text to explain.")
+  // Function to read from clipboard and set input
+  const handleExplainClipboard = async () => {
+    try {
+      const clipboardText = await navigator.clipboard.readText()
+
+      if(!clipboardText.trim()) {
+        setOutput("Clipboard is empty.")
+        return
+      }
+
+      setInput(clipboardText)
+      await handleExplain(clipboardText)
+    } catch (err) {
+      setOutput("Failed to read clipboard: " + (err as Error).message)
+    }
+  }
+
+  const handleExplain = async (overrideText?: string) => {
+    const textToExplain = overrideText ?? input
+
+    if (!textToExplain.trim()) {
+      setOutput("No text available to explain from clipboard.")
       return
     }
 
@@ -19,29 +38,13 @@ function App() {
 
     try {
       // @ts-ignore
-      const result = await window.ai.explainText(input)
+      const result = await window.ai.explainText(textToExplain)
       setOutput(result)
-    } catch (err) {
+    }
+    catch (err) {
       setOutput("Error occurred: " + (err as Error).message)
     } finally {
       setLoading(false)
-    }
-  }
-
-  // Function to read from clipboard and set input
-  const handleExplainClipboard = async () => {
-    try {
-      const text = await navigator.clipboard.readText()
-
-      if (!text.trim()) {
-        setOutput("Clipboard is empty.")
-        return
-      }
-
-      setInput(text)
-      setOutput("Clipboard text loaded. Click Explain to continue.")
-    } catch (err) {
-      setOutput("Could not read clipboard.")
     }
   }
 
@@ -61,7 +64,7 @@ function App() {
         onChange={(e) => setInput(e.target.value)}
       />
       <div className="card">
-        <button onClick={handleExplain} disabled={loading}>
+        <button onClick={() => handleExplain()} disabled={loading}>
           {loading ? "Loading..." : "Explain Text"}
         </button>
 
