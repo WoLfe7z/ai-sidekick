@@ -4,7 +4,29 @@ import viteLogo from '/electron-vite.animate.svg'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [input, setInput] = useState("")
+  const [output, setOutput] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  const handleExplain = async () => {
+    if (!input.trim()) {
+      setOutput("Please enter some text to explain.")
+      return
+    }
+
+    setLoading(true)
+    setOutput("")
+
+    try {
+      // @ts-ignore
+      const result = await window.ai.explainText(input)
+      setOutput(result)
+    } catch (err) {
+      setOutput("Error occurred: " + (err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <>
@@ -16,18 +38,19 @@ function App() {
           <img src={reactLogo} className="logo react" alt="React logo" />
         </a>
       </div>
-      <h1>Vite + React</h1>
+      <textarea
+        placeholder="Paste code, errors, or text here..."
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+      />
       <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
+        <button onClick={handleExplain} disabled={loading}>
+          {loading ? "Loading..." : "Explain Text"}
         </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
+      <div className="output">
+        {output}
+      </div>
     </>
   )
 }

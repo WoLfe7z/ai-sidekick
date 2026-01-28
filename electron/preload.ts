@@ -1,5 +1,12 @@
 import { ipcRenderer, contextBridge } from 'electron'
 
+// --------- Expose AI methods to the Renderer process ---------
+contextBridge.exposeInMainWorld('ai', {
+  explainText: async (text: string): Promise<string> => {
+    return await ipcRenderer.invoke('ai:explain', text)
+  }
+})
+
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on(...args: Parameters<typeof ipcRenderer.on>) {

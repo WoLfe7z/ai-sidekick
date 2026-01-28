@@ -1,5 +1,10 @@
 "use strict";
 const electron = require("electron");
+electron.contextBridge.exposeInMainWorld("ai", {
+  explainText: async (text) => {
+    return await electron.ipcRenderer.invoke("ai:explain", text);
+  }
+});
 electron.contextBridge.exposeInMainWorld("ipcRenderer", {
   on(...args) {
     const [channel, listener] = args;

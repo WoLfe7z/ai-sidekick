@@ -1,7 +1,44 @@
-import { app, BrowserWindow } from 'electron'
+import 'dotenv/config'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+
+// Ai
+import OpenAI from 'openai'
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+// Handle AI explain request
+ipcMain.handle('ai:explain', async (_event, text: string) => {
+  if(!text?.trim())
+    return 'No input provided.'
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert AI assistant that explains code and errors clearly and concisely.'
+        },
+        {
+          role: 'user',
+          content: text
+        }
+      ],
+      temperature: 0.3
+    })
+
+    return response.choices[0].message.content ?? 'No explanation provided.'
+  } catch (err: any) {
+    if (err?.code === 'insufficient_quota')
+      return '⚠️ OpenAI API quota exceeded. Please check your billing settings.'
+
+    return '⚠️ AI service error. Please try again later.'
+  }
+})
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
