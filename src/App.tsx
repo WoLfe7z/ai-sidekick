@@ -5,6 +5,7 @@ import { Star, Pencil, Trash2, X } from 'lucide-react'
 // Chat history
 import { Chat, Message } from './types/chat'
 import { createNewChat, addMessageToChat } from './state/chatStore'
+import { set } from 'mongoose'
 
 function App() {
   // Chat state
@@ -13,11 +14,14 @@ function App() {
   const isExplainingRef = useRef(false)
   const activeChatIdRef = useRef<string | null>(null)
 
+  // Chat context menu states
   const [chatContextMenu, setChatContextMenu] = useState<{
     x: number
     y: number
     chatId: string
   } | null>(null)
+  const [renamingChatId, setRenamingChatId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
 
   // Function to read from clipboard and set input
   const addSystemMessage = (text: string) => {
@@ -128,6 +132,27 @@ function App() {
     }
   }, [])
 
+  // Highlight text when renaming
+  useEffect(() => {
+    if (!renamingChatId) return
+
+    requestAnimationFrame(() => {
+      const el = document.querySelector(
+        `.chat-item.active .chat-title-editing`
+      ) as HTMLElement | null
+
+      if (!el) return
+
+      const range = document.createRange()
+      const sel = window.getSelection()
+
+      range.selectNodeContents(el)
+      range.collapse(false) // move caret to END
+      sel?.removeAllRanges()
+      sel?.addRange(range)
+    })
+  }, [renamingChatId])
+
   const activeChat = chats.find(c => c.id === activeChatId)
 
   return (
@@ -150,7 +175,10 @@ function App() {
             <div
               key={chat.id}
               className={`chat-item ${chat.id === activeChatId ? 'active' : ''}`}
-              onClick={() => setActiveChatId(chat.id)}
+              onClick={() => {
+                if (renamingChatId) return
+                setActiveChatId(chat.id)
+              }}
               onContextMenu={e => {
                 e.preventDefault()
                 setChatContextMenu({
@@ -160,7 +188,39 @@ function App() {
                 })
               }}
             >
-              <div className="chat-title">{chat.title}</div>
+              {renamingChatId === chat.id ? (
+                <span
+                  className="chat-title chat-title-editing"
+                  contentEditable
+                  suppressContentEditableWarning
+                  autoFocus
+                  onBlur={e => {
+                    const value = e.currentTarget.textContent?.trim()
+                    if (value) {
+                      setChats(prev =>
+                        prev.map(c =>
+                          c.id === chat.id ? { ...c, title: value } : c
+                        )
+                      )
+                    }
+                    setRenamingChatId(null)
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      e.currentTarget.blur()
+                    }
+                    if (e.key === 'Escape') {
+                      e.currentTarget.textContent = chat.title
+                      setRenamingChatId(null)
+                    }
+                  }}
+                >
+                  {chat.title}
+                </span>
+              ) : (
+                <div className="chat-title">{chat.title}</div>
+              )}
             </div>
           ))}
         </div>
@@ -194,7 +254,19 @@ function App() {
           onClick={() => setChatContextMenu(null)}
         >
           <div className="context-item"><Star size={18} /><span>Favorite</span></div>
-          <div className="context-item"><Pencil size={18} /><span>Rename</span></div>
+          <div 
+            className="context-item" onClick={() => {
+              const chat = chats.find(c => c.id === chatContextMenu.chatId)
+              if(!chat) return
+
+              setRenamingChatId(chat.id)
+              setRenameValue(chat.title)
+              setChatContextMenu(null)
+            }}
+          >
+            <Pencil size={18} />
+            <span>Rename</span>
+          </div>
           <div className="context-item"><Trash2 size={18} /><span>Delete</span></div>
           <div className="context-item"><X size={18} /><span>Deselect</span></div>
         </div>
