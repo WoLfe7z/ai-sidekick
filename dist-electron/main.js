@@ -2,8 +2,7 @@ import require$$0 from "fs";
 import require$$1 from "path";
 import require$$2 from "os";
 import require$$3 from "crypto";
-import { ipcMain, app, BrowserWindow, globalShortcut } from "electron";
-import { createRequire } from "node:module";
+import { app, ipcMain, globalShortcut, BrowserWindow, nativeImage, Tray, Menu } from "electron";
 import { fileURLToPath } from "node:url";
 import path$2 from "node:path";
 var main = { exports: {} };
@@ -6955,88 +6954,104 @@ OpenAI.Conversations = Conversations;
 OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
 OpenAI.Videos = Videos;
+let win = null;
+let tray = null;
+const __dirname$1 = path$2.dirname(fileURLToPath(import.meta.url));
+if (process.platform === "win32") {
+  app.setAppUserModelId("com.yourname.ai-sidekick");
+}
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 ipcMain.handle("ai:explain", async (_event, text) => {
-  if (!(text == null ? void 0 : text.trim()))
-    return "No input provided.";
+  if (!(text == null ? void 0 : text.trim())) return "No input provided.";
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        {
-          role: "system",
-          content: "You are an expert AI assistant that explains code and errors clearly and concisely."
-        },
-        {
-          role: "user",
-          content: text
-        }
+        { role: "system", content: "You are an expert AI assistant that explains code and errors clearly and concisely." },
+        { role: "user", content: text }
       ],
       temperature: 0.3
     });
     return response.choices[0].message.content ?? "No explanation provided.";
   } catch (err) {
-    if ((err == null ? void 0 : err.code) === "insufficient_quota")
+    if ((err == null ? void 0 : err.code) === "insufficient_quota") {
       return "⚠️ OpenAI API quota exceeded. Please check your billing settings.";
+    }
     return "⚠️ AI service error. Please try again later.";
   }
 });
-createRequire(import.meta.url);
-const __dirname$1 = path$2.dirname(fileURLToPath(import.meta.url));
-process.env.APP_ROOT = path$2.join(__dirname$1, "..");
-const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
-const MAIN_DIST = path$2.join(process.env.APP_ROOT, "dist-electron");
-const RENDERER_DIST = path$2.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$2.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
-let win;
 function createWindow() {
   win = new BrowserWindow({
-    icon: path$2.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+    icon: getTrayIconPath(),
     webPreferences: {
       preload: path$2.join(__dirname$1, "preload.mjs")
     }
   });
-  win.webContents.on("did-finish-load", () => {
-    win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
+  win.on("close", (event) => {
+    event.preventDefault();
+    win == null ? void 0 : win.hide();
   });
-  if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL);
+  if (process.env.VITE_DEV_SERVER_URL) {
+    win.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
-    win.loadFile(path$2.join(RENDERER_DIST, "index.html"));
+    win.loadFile(path$2.join(__dirname$1, "../dist/index.html"));
   }
 }
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-    win = null;
+function getTrayIconPath() {
+  if (process.env.VITE_DEV_SERVER_URL) {
+    return path$2.join(process.cwd(), "public", "sidekick-tray-icon.ico");
   }
+  return path$2.join(__dirname$1, "sidekick-tray-icon.ico");
+}
+function createTray() {
+  const iconPath = getTrayIconPath();
+  const trayIcon = nativeImage.createFromPath(iconPath);
+  if (trayIcon.isEmpty()) {
+    console.error("Tray icon failed to load.");
+    return;
+  }
+  tray = new Tray(trayIcon);
+  const trayMenu = Menu.buildFromTemplate([
+    {
+      label: "Show AI Sidekick",
+      click: () => {
+        win == null ? void 0 : win.show();
+        win == null ? void 0 : win.focus();
+      }
+    },
+    {
+      label: "Explain Clipboard",
+      click: () => {
+        win == null ? void 0 : win.show();
+        win == null ? void 0 : win.focus();
+        win == null ? void 0 : win.webContents.send("explain-clipboard");
+      }
+    },
+    { type: "separator" },
+    {
+      label: "Quit",
+      click: () => app.quit()
+    }
+  ]);
+  tray.setToolTip("AI Sidekick");
+  tray.setContextMenu(trayMenu);
+}
+app.whenReady().then(() => {
+  createWindow();
+  createTray();
+  const success = globalShortcut.register("CommandOrControl+Alt+E", () => {
+    win == null ? void 0 : win.show();
+    win == null ? void 0 : win.focus();
+    win == null ? void 0 : win.webContents.send("explain-clipboard");
+  });
+  console.log(
+    success ? "✅ Global shortcut registered" : "❌ Failed to register global shortcut"
+  );
 });
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+app.on("window-all-closed", () => {
 });
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
 });
-app.whenReady().then(() => {
-  createWindow();
-  const success = globalShortcut.register("CommandOrControl+Alt+E", () => {
-    if (!win) return;
-    if (win.isMinimized()) win.restore();
-    win.show();
-    win.focus();
-    win.webContents.send("trigger-explain-clipboard");
-  });
-  if (!success)
-    console.error("Failed to register global shortcut.");
-  else
-    console.log("Global shortcut registered successfully.");
-});
-export {
-  MAIN_DIST,
-  RENDERER_DIST,
-  VITE_DEV_SERVER_URL
-};
