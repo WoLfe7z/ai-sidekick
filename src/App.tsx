@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Star, Pencil, Trash2, X, Command } from 'lucide-react' 
+import { Star, Pencil, Trash2, X, Command, Paperclip, Send } from 'lucide-react' 
 import './styles/base.css'
 import './styles/sidebar.css'
 import './styles/chat.css'
@@ -18,6 +18,7 @@ function App() {
   const [chats, setChats] = useState<Chat[]>([])
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [isTyping, setIsTyping] = useState(false)
+  const [messageInput, setMessageInput] = useState('')
   const isExplainingRef = useRef(false)
   const activeChatIdRef = useRef<string | null>(null)
 
@@ -145,6 +146,22 @@ function App() {
           }
         })
       )
+    }
+  }
+
+  const handleSendMessage = async () => {
+    if (!messageInput.trim() || isTyping) return
+    
+    const message = messageInput.trim()
+    setMessageInput('') // Clear input immediately
+    
+    await handleExplain(message)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
     }
   }
 
@@ -414,7 +431,11 @@ function App() {
                   <>
                     {activeChat.messages.map(msg => (
                       <div key={msg.id} className={`msg-row ${msg.role}`}>
-                        <div className="msg-bubble">{msg.content}</div>
+                        <div className="msg-bubble">
+                          {msg.role === 'assistant' && <div className="msg-label">AI</div>}
+                          {msg.role === 'user' && <div className="msg-label">You</div>}
+                          <div className="msg-content">{msg.content}</div>
+                        </div>
                       </div>
                     ))}
                     {isTyping && (
@@ -505,6 +526,45 @@ function App() {
             </div>
           )}
         </div>
+
+        {/* Message Input */}
+        {rightPanel === 'panel-chat' && activeChatId && (
+          <div className="message-input-container">
+            <div className="message-input-wrapper">
+              <div className="message-input-box">
+                <button className="attachment-button" title="Add attachment">
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Paperclip size={20} />
+                    </span>
+                </button>
+                <textarea
+                  className="message-input"
+                  placeholder="Type a message..."
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  disabled={isTyping}
+                  rows={1}
+                  onInput={(e) => {
+                    const target = e.target as HTMLTextAreaElement
+                    target.style.height = 'auto'
+                    target.style.height = Math.min(target.scrollHeight, 200) + 'px'
+                  }}
+                />
+                <button
+                  className="send-button"
+                  onClick={handleSendMessage}
+                  disabled={!messageInput.trim() || isTyping}
+                  title="Send message"
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Send size={18} />
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Chat context menu */}
