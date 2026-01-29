@@ -23,6 +23,41 @@ function App() {
   const isExplainingRef = useRef(false)
   const activeChatIdRef = useRef<string | null>(null)
 
+  // Chat sorting
+  type SortOption = 'latest' | 'oldest' | 'favorite' | 'name'
+  const [sortBy, setSortBy] = useState<SortOption>('latest')
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const getSortedChats = () => {
+    let chatsCopy = [...chats]
+    
+    // Filter by search query first
+    if (searchQuery.trim()) {
+      chatsCopy = chatsCopy.filter(chat =>
+        chat.title.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    }
+    
+    // Then sort
+    switch (sortBy) {
+      case 'latest':
+        return chatsCopy.sort((a, b) => b.createdAt - a.createdAt)
+      case 'oldest':
+        return chatsCopy.sort((a, b) => a.createdAt - b.createdAt)
+      case 'favorite':
+        return chatsCopy.sort((a, b) => {
+          if (a.favorite && !b.favorite) return -1
+          if (!a.favorite && b.favorite) return 1
+          return b.createdAt - a.createdAt
+        })
+      case 'name':
+        return chatsCopy.sort((a, b) => a.title.localeCompare(b.title))
+      default:
+        return chatsCopy
+    }
+  }
+
   // Chat context menu states
   const [chatContextMenu, setChatContextMenu] = useState<{
     x: number
@@ -313,13 +348,25 @@ function App() {
     return () => window.removeEventListener('keydown', handleKey)
   }, [editingShortcut])
 
-  const activeChat = chats.find(c => c.id === activeChatId)
+  // Dropdown sorting click handler
+  useEffect(() => {
+    const closeSortDropdown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.sort-container')) {
+        setSortDropdownOpen(false)
+      }
+    }
 
-  const sortedChats = [...chats].sort((a, b) => {
-    if (a.favorite && !b.favorite) return -1
-    if (!a.favorite && b.favorite) return 1
-    return 0
-  })
+    if (sortDropdownOpen) {
+      window.addEventListener('click', closeSortDropdown)
+    }
+
+    return () => {
+      window.removeEventListener('click', closeSortDropdown)
+    }
+  }, [sortDropdownOpen])
+
+  const activeChat = chats.find(c => c.id === activeChatId)
 
   return (
     <div className="app">
@@ -336,8 +383,87 @@ function App() {
           + New Chat
         </button>
 
+        <div className="sidebar-divider"></div>
+
+        {/* Search Field */}
+        <div className="search-container">
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Search chats..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button 
+              className="search-clear"
+              onClick={() => setSearchQuery('')}
+              title="Clear search"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+
+        {/* Sort Dropdown */}
+        <div className="sort-container">
+          <button 
+            className="sort-button"
+            onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+          >
+            <span>Sort: {
+              sortBy === 'latest' ? 'Latest First' :
+              sortBy === 'oldest' ? 'Oldest First' :
+              sortBy === 'favorite' ? 'Favorites First' :
+              'Alphabetical'
+            }</span>
+            <span className="sort-arrow">{sortDropdownOpen ? '▲' : '▼'}</span>
+          </button>
+
+          {sortDropdownOpen && (
+            <div className="sort-dropdown">
+              <div 
+                className={`sort-option ${sortBy === 'latest' ? 'active' : ''}`}
+                onClick={() => {
+                  setSortBy('latest')
+                  setSortDropdownOpen(false)
+                }}
+              >
+                Latest First
+              </div>
+              <div 
+                className={`sort-option ${sortBy === 'oldest' ? 'active' : ''}`}
+                onClick={() => {
+                  setSortBy('oldest')
+                  setSortDropdownOpen(false)
+                }}
+              >
+                Oldest First
+              </div>
+              <div 
+                className={`sort-option ${sortBy === 'favorite' ? 'active' : ''}`}
+                onClick={() => {
+                  setSortBy('favorite')
+                  setSortDropdownOpen(false)
+                }}
+              >
+                Favorites First
+              </div>
+              <div 
+                className={`sort-option ${sortBy === 'name' ? 'active' : ''}`}
+                onClick={() => {
+                  setSortBy('name')
+                  setSortDropdownOpen(false)
+                }}
+              >
+                Alphabetical
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="chat-list">
-          {sortedChats.map(chat => (
+          {getSortedChats().map(chat => (
             <div
               key={chat.id}
               className={`chat-item ${chat.id === activeChatId ? 'active' : ''}${chat.isDeleting ? 'chat-deleting' : ''}`}

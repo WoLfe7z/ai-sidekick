@@ -157,3 +157,128 @@
   color: #e5e7eb;
   border-color: #333;
 }
+
+/* ============================================
+   SORT DROPDOWN
+   ============================================ */
+
+.sort-container {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.sort-button {
+  width: 100%;
+  padding: 8px 12px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: #e5e7eb;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sort-button:hover {
+  background: #222;
+  border-color: #333;
+}
+
+.sort-arrow {
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.sort-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  animation: menuFadeIn 0.15s ease-out;
+}
+
+.sort-option {
+  padding: 8px 1px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s ease;
+  font-size: 0.85rem;
+}
+
+.sort-option:hover {
+  background: #222;
+}
+
+.sort-option.active {
+  background: #2a2a2a;
+  color: #60a5fa;
+  font-weight: bold;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: #222;
+  margin: 12px 0;
+}
+
+/* ============================================
+   SEARCH BAR
+   ============================================ */
+.search-container {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 32px 10px 12px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: #e5e7eb;
+  font-size: 0.85rem;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.search-input:focus {
+  background: #222;
+  border-color: #333;
+}
+
+.search-input::placeholder {
+  color: #6b7280;
+}
+
+.search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.search-clear:hover {
+  background: #2a2a2a;
+  color: #9ca3af;
+}
