@@ -1,13 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
-import './App.css'
-import { Star, Pencil, Trash2, X } from 'lucide-react' 
+import { Star, Pencil, Trash2, X, Command } from 'lucide-react' 
+import './styles/base.css'
+import './styles/sidebar.css'
+import './styles/chat.css'
+import './styles/context-menu.css'
+import './styles/shortcut.css'
 
 // Chat history
 import { Chat, Message } from './types/chat'
 import { createNewChat, addMessageToChat } from './state/chatStore'
-import { set } from 'mongoose'
 
 function App() {
+  type RightPanel = 'panel-chat' | 'panel-shortcuts'
+  const [rightPanel, setRightPanel] = useState<RightPanel>('panel-chat')
+
   // Chat state
   const [chats, setChats] = useState<Chat[]>([])
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
@@ -25,12 +31,13 @@ function App() {
   const deleteTimeoutRef = useRef<number | null>(null)
 
   // Shortcuts
-  const SHORTCUTS = {
+  const [shortcuts, setShortcuts] = useState({
     favorite: 'f',
     rename : 'r',
     delete : 'delete',
     deselect : 'escape'
-  } as const
+  })
+  const [editingShortcut, setEditingShortcut] = useState<keyof typeof shortcuts | null>(null)
 
   // Function to read from clipboard and set input
   const addSystemMessage = (text: string) => {
@@ -190,6 +197,8 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (editingShortcut) return
+
       // Ignore if typing in an editable field
       const target = e.target as HTMLElement
       if (target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(target.tagName)) return
@@ -198,7 +207,7 @@ function App() {
       // Handle keyboard shortcuts for active chat
       const key = e.key.toLowerCase()
       switch (key) {
-        case SHORTCUTS.favorite:
+        case shortcuts.favorite:
           e.preventDefault()
           setChats(prev =>
             prev.map(c =>
@@ -209,14 +218,14 @@ function App() {
           )
           break
 
-        case SHORTCUTS.rename:
+        case shortcuts.rename:
           e.preventDefault()
           setRenamingChatId(activeChatId)
           break
 
 
 
-        case SHORTCUTS.deselect:
+        case shortcuts.deselect:
           e.preventDefault()
           setActiveChatId(null)
           break
@@ -233,6 +242,28 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [activeChatId, chats])
 
+  useEffect(() => {
+    if (!editingShortcut) return
+
+    const handleKey = (e: KeyboardEvent) => {
+      e.preventDefault()
+
+      if (e.key === 'Escape') {
+        setEditingShortcut(null)
+        return
+      }
+
+      setShortcuts(prev => ({
+        ...prev,
+        [editingShortcut]: e.key.toLowerCase()
+      }))
+
+      setEditingShortcut(null)
+    }
+
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [editingShortcut])
 
   const activeChat = chats.find(c => c.id === activeChatId)
 
@@ -332,27 +363,105 @@ function App() {
             </div>
           ))}
         </div>
+
+        <div className="sidebar-footer">
+          <button
+            className="sidebar-icon-button"
+            title="Keyboard shortcuts"
+            onClick={() => setRightPanel(prev => prev === 'panel-shortcuts' ? 'panel-chat' : 'panel-shortcuts')}
+          >
+            <Command size={18} />
+          </button>
+        </div>
       </div>
 
-      {/* Main chat area */}
-      <div className="chat">
-        <div className="chat-inner">
-          {activeChat ? (
-            activeChat.messages.map(msg => (
-              <div key={msg.id} className={`msg-row ${msg.role}`}>
-                <div className="msg-bubble">
-                  {msg.role !== 'system' && (
-                    <div className="msg-author">
-                      {msg.role === 'user' ? 'You' : 'AI'}
+      {/* Right panel */}
+      <div className="right-panel">
+        <div className="right-panel-inner">
+          {rightPanel === 'panel-chat' && (
+            <div className="chat">
+              <div className="chat-inner">
+                {activeChat ? (
+                  activeChat.messages.map(msg => (
+                    <div key={msg.id} className={`msg-row ${msg.role}`}>
+                      <div className="msg-bubble">{msg.content}</div>
                     </div>
-                  )}
-                  <div className="msg-content">{msg.content}</div>
+                  ))
+                ) : (
+                  <div className="chat-empty">Select a chat</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {rightPanel === 'panel-shortcuts' && (
+            <div className="shortcuts-panel">
+              <div className="shortcuts-header">
+                <h2>Keyboard Shortcuts</h2>
+                <p>Click on any shortcut to change it.</p>
+              </div>
+
+              <div className="shortcuts-list">
+                <div className="shortcut-item">
+                  <div className="shortcut-info">
+                    <div className="shortcut-name">Favorite Chat</div>
+                    <div className="shortcut-description">Mark the active chat as favorite</div>
+                  </div>
+                  <div className="shortcut-key-wrapper">
+                    <div
+                      className={`shortcut-key ${editingShortcut === 'favorite' ? 'editing' : ''}`}
+                      onClick={() => setEditingShortcut('favorite')}
+                    >
+                      {editingShortcut === 'favorite' ? 'Press key' : shortcuts.favorite}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="shortcut-item">
+                  <div className="shortcut-info">
+                    <div className="shortcut-name">Rename Chat</div>
+                    <div className="shortcut-description">Rename the active chat</div>
+                  </div>
+                  <div className="shortcut-key-wrapper">
+                    <div
+                      className={`shortcut-key ${editingShortcut === 'rename' ? 'editing' : ''}`}
+                      onClick={() => setEditingShortcut('rename')}
+                    >
+                      {editingShortcut === 'rename' ? 'Press key' : shortcuts.rename}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="shortcut-item">
+                  <div className="shortcut-info">
+                    <div className="shortcut-name">Delete Chat</div>
+                    <div className="shortcut-description">Delete the active chat</div>
+                  </div>
+                  <div className="shortcut-key-wrapper">
+                    <div
+                      className={`shortcut-key ${editingShortcut === 'delete' ? 'editing' : ''}`}
+                      onClick={() => setEditingShortcut('delete')}
+                    >
+                      {editingShortcut === 'delete' ? 'Press key' : shortcuts.delete}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="shortcut-item">
+                  <div className="shortcut-info">
+                    <div className="shortcut-name">Deselect Chat</div>
+                    <div className="shortcut-description">Clear the active chat selection</div>
+                  </div>
+                  <div className="shortcut-key-wrapper">
+                    <div
+                      className={`shortcut-key ${editingShortcut === 'deselect' ? 'editing' : ''}`}
+                      onClick={() => setEditingShortcut('deselect')}
+                    >
+                      {editingShortcut === 'deselect' ? 'Press key' : shortcuts.deselect}
+                    </div>
+                  </div>
                 </div>
               </div>
-            ))
-          ) : (
-            <div className="chat-empty">
-              Select a chat or create a new one
             </div>
           )}
         </div>
@@ -385,7 +494,7 @@ function App() {
               <Star size={18} />
               <span>Favorite</span>
             </div>  
-            <span className='context-shortcut'>{SHORTCUTS.favorite.toUpperCase()}</span>          
+            <span className='context-shortcut'>{shortcuts.favorite.toUpperCase()}</span>          
           </div>
 
           <div className='context-item'>
@@ -401,7 +510,7 @@ function App() {
               <Pencil size={18} />
               <span>Rename</span>
             </div>  
-            <span className='context-shortcut'>{SHORTCUTS.rename.toUpperCase()}</span>          
+            <span className='context-shortcut'>{shortcuts.rename.toUpperCase()}</span>          
           </div>
 
           <div className='context-item'>
@@ -415,7 +524,7 @@ function App() {
               <Trash2 size={18} />
               <span>Delete</span>
             </div>            
-            <span className='context-shortcut'>{SHORTCUTS.delete.toUpperCase()}</span>          
+            <span className='context-shortcut'>{shortcuts.delete.toUpperCase()}</span>          
           </div>
 
           <div className='context-item'>
@@ -429,7 +538,7 @@ function App() {
               <X size={18} />
               <span>Deselect</span>
             </div> 
-            <span className='context-shortcut'>{SHORTCUTS.deselect.toUpperCase()}</span>           
+            <span className='context-shortcut'>{shortcuts.deselect.toUpperCase()}</span>           
           </div>
         </div>
       )}
