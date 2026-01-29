@@ -12,7 +12,7 @@ export function createNewChat(initialMessage?: Message): Chat {
     id: crypto.randomUUID(),
     title: initialMessage
       ? initialMessage.content.slice(0, 40)
-      : 'New Chat: ' + new Date(now).toLocaleString(),
+      : 'New Chat: ' + new Date(now).toLocaleString().slice(0, -3),
     messages: initialMessage ? [initialMessage] : [],
     createdAt: now,
     updatedAt: now

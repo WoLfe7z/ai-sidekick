@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
 // Chat history
@@ -9,6 +9,8 @@ function App() {
   // Chat state
   const [chats, setChats] = useState<Chat[]>([])
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
+  const isExplainingRef = useRef(false)
+  const activeChatIdRef = useRef<string | null>(null)
 
   // Function to read from clipboard and set input
   const addSystemMessage = (text: string) => {
@@ -21,17 +23,18 @@ function App() {
 
     if (!activeChatId) {
       const newChat = createNewChat(systemMessage)
-      setChats([newChat])
+      setChats(prev => [newChat, ...prev]) // Append
       setActiveChatId(newChat.id)
       return
     }
 
-    setChats(prev =>
-      addMessageToChat(prev, activeChatId, systemMessage)
-    )
+    setChats(prev => addMessageToChat(prev, activeChatId, systemMessage))
   }
 
   const handleExplainClipboard = async () => {
+    if (isExplainingRef.current) return
+    isExplainingRef.current = true
+
     try {
       const clipboardText = await navigator.clipboard.readText()
 
@@ -45,11 +48,24 @@ function App() {
       addSystemMessage(
         "⚠️ Failed to read clipboard: " + (err as Error).message
       )
+    } finally {
+      isExplainingRef.current = false
     }
   }
 
   const handleExplain = async (text: string) => {
     if (!text.trim()) return
+
+    let chatId = activeChatIdRef.current
+
+    // ONLY create chat if none is selected or no chats exist
+    if (!chatId) {
+      const newChat = createNewChat()
+      setChats(prev => [newChat, ...prev])
+      setActiveChatId(newChat.id)
+      activeChatIdRef.current = newChat.id
+      chatId = newChat.id
+    }
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -58,19 +74,9 @@ function App() {
       timestamp: Date.now()
     }
 
-    let chatId = activeChatId
+    // Append message, DO NOT replace chats
+    setChats(prev => addMessageToChat(prev, chatId!, userMessage))
 
-    // Create chat if none exists
-    if (!chatId) {
-      const newChat = createNewChat(userMessage)
-      setChats([newChat])
-      setActiveChatId(newChat.id)
-      chatId = newChat.id
-    } else {
-      setChats(prev => addMessageToChat(prev, chatId!, userMessage))
-    }
-
-    // Call AI
     const reply = await window.ai.explainText(text)
 
     const assistantMessage: Message = {
@@ -80,9 +86,14 @@ function App() {
       timestamp: Date.now()
     }
 
+    // Append again
     setChats(prev => addMessageToChat(prev, chatId!, assistantMessage))
   }
 
+  // --------- Effects ---------
+  useEffect(() => {
+    activeChatIdRef.current = activeChatId
+  }, [activeChatId])
 
   useEffect(() => {
     const handleHotKey = async () => {
