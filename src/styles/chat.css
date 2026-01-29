@@ -277,3 +277,76 @@
   color: #666;
   cursor: not-allowed;
 }
+
+/* ============================================
+   MESSAGE REACTIONS
+   ============================================ */
+.msg-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  margin-left: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.msg-row + .msg-actions {
+  justify-content: flex-start;
+}
+
+/* Show actions on hover */
+.msg-row:hover + .msg-actions,
+.msg-actions:hover {
+  opacity: 1;
+}
+
+.msg-action-btn {
+  padding: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.msg-action-btn:hover:not(:disabled) {
+  background: #222; /* Box appears on hover */
+  color: #9ca3af;
+  border-color: #333;
+}
+
+.msg-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.msg-action-btn.active-like {
+  color: #60a5fa;
+  background: transparent; /* Keep transparent when not hovering */
+  border-color: transparent;
+}
+
+.msg-action-btn.active-like:hover {
+  background: #1e3a8a; /* Box appears on hover */
+  border-color: #1e40af;
+}
+
+.msg-action-btn.active-dislike {
+  color: #f87171;
+  background: transparent; /* Keep transparent when not hovering */
+  border-color: transparent;
+}
+
+.msg-action-btn.active-dislike:hover {
+  background: #7f1d1d; /* Box appears on hover */
+  border-color: #991b1b;
+}
+
+.msg-action-btn svg {
+  display: block;
+  flex-shrink: 0;
+}

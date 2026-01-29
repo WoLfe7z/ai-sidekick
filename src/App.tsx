@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Star, Pencil, Trash2, X, Command, Paperclip, Send } from 'lucide-react' 
+import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react' 
 import './styles/base.css'
 import './styles/sidebar.css'
 import './styles/chat.css'
@@ -13,6 +13,94 @@ import { createNewChat, addMessageToChat } from './state/chatStore'
 function App() {
   type RightPanel = 'panel-chat' | 'panel-shortcuts'
   const [rightPanel, setRightPanel] = useState<RightPanel>('panel-chat')
+
+  // Message reactions
+  const [messageReactions, setMessageReactions] = useState<{
+    [messageId: string]: 'like' | 'dislike' | null
+  }>({})
+
+  const handleCopyMessage = (content: string) => {
+    navigator.clipboard.writeText(content)
+  }
+
+  const handleLikeMessage = (messageId: string) => {
+    setMessageReactions(prev => ({
+      ...prev,
+      [messageId]: prev[messageId] === 'like' ? null : 'like'
+    }))
+  }
+
+  const handleDislikeMessage = (messageId: string) => {
+    setMessageReactions(prev => ({
+      ...prev,
+      [messageId]: prev[messageId] === 'dislike' ? null : 'dislike'
+    }))
+  }
+
+  const handleRetryMessage = async (messageIndex: number) => {
+    if (!activeChatId || isTyping) return
+    
+    const chat = chats.find(c => c.id === activeChatId)
+    if (!chat) return
+    
+    // Find the user message before this AI message
+    const userMessage = chat.messages[messageIndex - 1]
+    if (!userMessage || userMessage.role !== 'user') return
+    
+    // Remove the AI message
+    setChats(prev =>
+      prev.map(c => {
+        if (c.id !== activeChatId) return c
+        return {
+          ...c,
+          messages: c.messages.slice(0, messageIndex)
+        }
+      })
+    )
+    
+    // Show typing indicator
+    setIsTyping(true)
+
+    // Get new response
+    const reply = await window.ai.explainText(userMessage.content)
+
+    // Hide typing indicator
+    setIsTyping(false)
+
+    // Create assistant message with empty content initially
+    const assistantMessageId = crypto.randomUUID()
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now()
+    }
+
+    // Add empty message
+    setChats(prev => addMessageToChat(prev, activeChatId, assistantMessage))
+
+    // Stream the text character by character
+    const chars = reply.split('')
+    for (let i = 0; i < chars.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+      
+      setChats(prev => 
+        prev.map(chat => {
+          if (chat.id !== activeChatId) return chat
+          return {
+            ...chat,
+            messages: chat.messages.map(msg => {
+              if (msg.id !== assistantMessageId) return msg
+              return {
+                ...msg,
+                content: reply.substring(0, i + 1)
+              }
+            })
+          }
+        })
+      )
+    }
+  }
 
   // Chat state
   const [chats, setChats] = useState<Chat[]>([])
@@ -557,13 +645,50 @@ function App() {
               <div className="chat-inner">
                 {activeChat ? (
                   <>
-                    {activeChat.messages.map(msg => (
-                      <div key={msg.id} className={`msg-row ${msg.role}`}>
-                        <div className="msg-bubble">
-                          {msg.role === 'assistant' && <div className="msg-label">AI</div>}
-                          {msg.role === 'user' && <div className="msg-label">You</div>}
-                          <div className="msg-content">{msg.content}</div>
+                    {activeChat.messages.map((msg, index) => (
+                      <div key={msg.id}>
+                        <div className={`msg-row ${msg.role}`}>
+                          <div className="msg-bubble">
+                            {msg.role === 'assistant' && <div className="msg-label">AI</div>}
+                            {msg.role === 'user' && <div className="msg-label">You</div>}
+                            <div className="msg-content">{msg.content}</div>
+                          </div>
                         </div>
+                        
+                        {/* Action buttons for AI messages */}
+                        {msg.role === 'assistant' && (
+                          <div className="msg-actions">
+                            <button
+                              className="msg-action-btn"
+                              onClick={() => handleCopyMessage(msg.content)}
+                              title="Copy"
+                            >
+                              <Copy size={14} />
+                            </button>
+                            <button
+                              className={`msg-action-btn ${messageReactions[msg.id] === 'like' ? 'active-like' : ''}`}
+                              onClick={() => handleLikeMessage(msg.id)}
+                              title="Like"
+                            >
+                              <ThumbsUp size={14} />
+                            </button>
+                            <button
+                              className={`msg-action-btn ${messageReactions[msg.id] === 'dislike' ? 'active-dislike' : ''}`}
+                              onClick={() => handleDislikeMessage(msg.id)}
+                              title="Dislike"
+                            >
+                              <ThumbsDown size={14} />
+                            </button>
+                            <button
+                              className="msg-action-btn"
+                              onClick={() => handleRetryMessage(index)}
+                              title="Retry"
+                              disabled={isTyping}
+                            >
+                              <RotateCcw size={14} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                     {userIsTyping && (

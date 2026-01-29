@@ -14,7 +14,7 @@
 .new-chat {
   width: 100%;
   padding: 10px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   background: #1a1a1a;
   border: 1px solid #2a2a2a;
   border-radius: 8px;
@@ -229,7 +229,7 @@
 .sidebar-divider {
   height: 1px;
   background: #222;
-  margin: 12px 0;
+  margin: 8px 0;
 }
 
 /* ============================================
@@ -238,6 +238,7 @@
 .search-container {
   position: relative;
   margin-bottom: 12px;
+  margin-top: 8px;
 }
 
 .search-input {
