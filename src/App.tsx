@@ -86,14 +86,13 @@ function App() {
 
   useEffect(() => {
     const handleHotKey = async () => {
+      console.log('[IPC] explain-clipboard received')
       await handleExplainClipboard()
     }
 
-    // @ts-ignore
     window.ipcRenderer.on('trigger-explain-clipboard', handleHotKey)
 
     return () => {
-      // @ts-ignore
       window.ipcRenderer.off('trigger-explain-clipboard', handleHotKey)
     }
   }, [])

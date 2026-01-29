@@ -97,7 +97,7 @@ function createTray() {
       click: () => {
         win?.show()
         win?.focus()
-        win?.webContents.send('explain-clipboard')
+        win?.webContents.send('trigger-explain-clipboard')
       }
     },
     { type: 'separator' },
@@ -119,7 +119,7 @@ app.whenReady().then(() => {
   const success = globalShortcut.register('CommandOrControl+Alt+E', () => {
     win?.show()
     win?.focus()
-    win?.webContents.send('explain-clipboard')
+    win?.webContents.send('trigger-explain-clipboard')
   })
 
   console.log(success

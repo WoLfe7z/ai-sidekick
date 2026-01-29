@@ -7026,7 +7026,7 @@ function createTray() {
       click: () => {
         win == null ? void 0 : win.show();
         win == null ? void 0 : win.focus();
-        win == null ? void 0 : win.webContents.send("explain-clipboard");
+        win == null ? void 0 : win.webContents.send("trigger-explain-clipboard");
       }
     },
     { type: "separator" },
@@ -7044,7 +7044,7 @@ app.whenReady().then(() => {
   const success = globalShortcut.register("CommandOrControl+Alt+E", () => {
     win == null ? void 0 : win.show();
     win == null ? void 0 : win.focus();
-    win == null ? void 0 : win.webContents.send("explain-clipboard");
+    win == null ? void 0 : win.webContents.send("trigger-explain-clipboard");
   });
   console.log(
     success ? "✅ Global shortcut registered" : "❌ Failed to register global shortcut"
