@@ -85,7 +85,6 @@
   content: '|';
   margin-left: 2px;
   animation: blink 1s step-start infinite;
-  caret-color: transparent;
 }
 
 @keyframes blink {

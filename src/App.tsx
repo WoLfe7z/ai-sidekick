@@ -17,6 +17,7 @@ function App() {
   // Chat state
   const [chats, setChats] = useState<Chat[]>([])
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
+  const [isTyping, setIsTyping] = useState(false)
   const isExplainingRef = useRef(false)
   const activeChatIdRef = useRef<string | null>(null)
 
@@ -104,17 +105,47 @@ function App() {
     // Append message, DO NOT replace chats
     setChats(prev => addMessageToChat(prev, chatId!, userMessage))
 
+    // Show typing indicator
+    setIsTyping(true)
+
     const reply = await window.ai.explainText(text)
 
+    // Hide typing indicator
+    setIsTyping(false)
+
+    // Create assistant message with empty content initially
+    const assistantMessageId = crypto.randomUUID()
     const assistantMessage: Message = {
-      id: crypto.randomUUID(),
+      id: assistantMessageId,
       role: 'assistant',
-      content: reply,
+      content: '',
       timestamp: Date.now()
     }
 
-    // Append again
+    // Add empty message
     setChats(prev => addMessageToChat(prev, chatId!, assistantMessage))
+
+    // Stream the text character by character
+    const chars = reply.split('')
+    for (let i = 0; i < chars.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 20)) // 20ms delay per character
+      
+      setChats(prev => 
+        prev.map(chat => {
+          if (chat.id !== chatId) return chat
+          return {
+            ...chat,
+            messages: chat.messages.map(msg => {
+              if (msg.id !== assistantMessageId) return msg
+              return {
+                ...msg,
+                content: reply.substring(0, i + 1)
+              }
+            })
+          }
+        })
+      )
+    }
   }
 
   // Delete chat function extracted for reuse
@@ -222,8 +253,6 @@ function App() {
           e.preventDefault()
           setRenamingChatId(activeChatId)
           break
-
-
 
         case shortcuts.deselect:
           e.preventDefault()
@@ -382,11 +411,22 @@ function App() {
             <div className="chat">
               <div className="chat-inner">
                 {activeChat ? (
-                  activeChat.messages.map(msg => (
-                    <div key={msg.id} className={`msg-row ${msg.role}`}>
-                      <div className="msg-bubble">{msg.content}</div>
-                    </div>
-                  ))
+                  <>
+                    {activeChat.messages.map(msg => (
+                      <div key={msg.id} className={`msg-row ${msg.role}`}>
+                        <div className="msg-bubble">{msg.content}</div>
+                      </div>
+                    ))}
+                    {isTyping && (
+                      <div className="typing-indicator">
+                        <div className="typing-bubble">
+                          <div className="typing-dot"></div>
+                          <div className="typing-dot"></div>
+                          <div className="typing-dot"></div>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="chat-empty">Select a chat</div>
                 )}
