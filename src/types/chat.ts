@@ -11,4 +11,6 @@ export type Chat = {
   messages: Message[]
   createdAt: number
   updatedAt: number
+  favorite?: boolean
+  isDeleting?: boolean
 }

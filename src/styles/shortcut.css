@@ -1,0 +1,125 @@
+/* ============================================
+   SHORTCUTS PANEL
+   ============================================ */
+
+.shortcuts-panel {
+  flex: 1;
+  padding: 48px;
+  overflow-y: auto;
+}
+
+.shortcuts-header {
+  margin-bottom: 32px;
+}
+
+.shortcuts-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: #e5e7eb;
+}
+
+.shortcuts-header p {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 600px;
+}
+
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.shortcut-item:hover {
+  background: #222;
+  border-color: #333;
+}
+
+.shortcut-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shortcut-name {
+  font-size: 0.95rem;
+  color: #e5e7eb;
+  font-weight: 500;
+}
+
+.shortcut-description {
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.shortcut-key-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shortcut-key {
+  min-width: 80px;
+  padding: 8px 16px;
+  background: #0a0a0a;
+  border: 1px solid #333;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.9rem;
+  text-align: center;
+  color: #e5e7eb;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-transform: uppercase;
+}
+
+.shortcut-key:hover {
+  background: #111;
+  border-color: #444;
+}
+
+.shortcut-key.editing {
+  background: #1e40af;
+  border-color: #2563eb;
+  color: #fff;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.shortcut-key.editing::after {
+  content: ' ...';
+  animation: dots 1.5s steps(3, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: ' .'; }
+  40% { content: ' ..'; }
+  60%, 100% { content: ' ...'; }
+}
+
+.edit-hint {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-style: italic;
+}
