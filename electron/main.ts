@@ -44,11 +44,19 @@ ipcMain.handle('ai:explain', async (_event, text: string) => {
 // ---------------- WINDOW ----------------
 function createWindow() {
   win = new BrowserWindow({
+    width: 800,
+    height: 1000,
+    resizable: false,
+    maximizable: false,
+    minimizable: true,
+    fullscreenable: false,
     icon: getTrayIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs')
     }
   })
+
+  win.setMenu(null)
 
   win.on('close', (event) => {
     event.preventDefault()

@@ -86,7 +86,6 @@ function App() {
 
   useEffect(() => {
     const handleHotKey = async () => {
-      console.log('[IPC] explain-clipboard received')
       await handleExplainClipboard()
     }
 
@@ -131,21 +130,20 @@ function App() {
 
       {/* Main chat area */}
       <div className="chat">
-        {!activeChat && (
-          <div className="empty">
-            <p>No chat selected.</p>
-            <p>Press <b>Ctrl + Alt + E</b> or create a new chat.</p>
-          </div>
-        )}
-
-        {activeChat?.messages.map(msg => (
-          <div key={msg.id} className={`msg ${msg.role}`}>
-            {msg.role !== 'system' && (
-              <strong>{msg.role === 'user' ? 'You' : 'AI'}:</strong>
-            )}
-            <div>{msg.content}</div>
-          </div>
-        ))}
+        <div className="chat-inner">
+          {activeChat?.messages.map(msg => (
+            <div key={msg.id} className={`msg-row ${msg.role}`}>
+              <div className="msg-bubble">
+                {msg.role !== 'system' && (
+                  <div className="msg-author">
+                    {msg.role === 'user' ? 'You' : 'AI'}
+                  </div>
+                )}
+                <div className="msg-content">{msg.content}</div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

@@ -6984,11 +6984,18 @@ ipcMain.handle("ai:explain", async (_event, text) => {
 });
 function createWindow() {
   win = new BrowserWindow({
+    width: 800,
+    height: 1e3,
+    resizable: false,
+    maximizable: false,
+    minimizable: true,
+    fullscreenable: false,
     icon: getTrayIconPath(),
     webPreferences: {
       preload: path$2.join(__dirname$1, "preload.mjs")
     }
   });
+  win.setMenu(null);
   win.on("close", (event) => {
     event.preventDefault();
     win == null ? void 0 : win.hide();
