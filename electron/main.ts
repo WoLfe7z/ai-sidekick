@@ -44,11 +44,19 @@ ipcMain.handle('ai:explain', async (_event, text: string) => {
 // ---------------- WINDOW ----------------
 function createWindow() {
   win = new BrowserWindow({
+    width: 800,
+    height: 1000,
+    resizable: false,
+    maximizable: false,
+    minimizable: true,
+    fullscreenable: false,
     icon: getTrayIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs')
     }
   })
+
+  win.setMenu(null)
 
   win.on('close', (event) => {
     event.preventDefault()
@@ -97,7 +105,7 @@ function createTray() {
       click: () => {
         win?.show()
         win?.focus()
-        win?.webContents.send('explain-clipboard')
+        win?.webContents.send('trigger-explain-clipboard')
       }
     },
     { type: 'separator' },
@@ -119,7 +127,7 @@ app.whenReady().then(() => {
   const success = globalShortcut.register('CommandOrControl+Alt+E', () => {
     win?.show()
     win?.focus()
-    win?.webContents.send('explain-clipboard')
+    win?.webContents.send('trigger-explain-clipboard')
   })
 
   console.log(success

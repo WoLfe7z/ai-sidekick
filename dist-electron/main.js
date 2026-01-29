@@ -6984,11 +6984,18 @@ ipcMain.handle("ai:explain", async (_event, text) => {
 });
 function createWindow() {
   win = new BrowserWindow({
+    width: 800,
+    height: 1e3,
+    resizable: false,
+    maximizable: false,
+    minimizable: true,
+    fullscreenable: false,
     icon: getTrayIconPath(),
     webPreferences: {
       preload: path$2.join(__dirname$1, "preload.mjs")
     }
   });
+  win.setMenu(null);
   win.on("close", (event) => {
     event.preventDefault();
     win == null ? void 0 : win.hide();
@@ -7026,7 +7033,7 @@ function createTray() {
       click: () => {
         win == null ? void 0 : win.show();
         win == null ? void 0 : win.focus();
-        win == null ? void 0 : win.webContents.send("explain-clipboard");
+        win == null ? void 0 : win.webContents.send("trigger-explain-clipboard");
       }
     },
     { type: "separator" },
@@ -7044,7 +7051,7 @@ app.whenReady().then(() => {
   const success = globalShortcut.register("CommandOrControl+Alt+E", () => {
     win == null ? void 0 : win.show();
     win == null ? void 0 : win.focus();
-    win == null ? void 0 : win.webContents.send("explain-clipboard");
+    win == null ? void 0 : win.webContents.send("trigger-explain-clipboard");
   });
   console.log(
     success ? "✅ Global shortcut registered" : "❌ Failed to register global shortcut"
