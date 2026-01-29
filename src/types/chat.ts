@@ -12,4 +12,5 @@ export type Chat = {
   createdAt: number
   updatedAt: number
   favorite?: boolean
+  isDeleting?: boolean
 }

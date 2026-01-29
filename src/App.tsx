@@ -21,7 +21,8 @@ function App() {
     chatId: string
   } | null>(null)
   const [renamingChatId, setRenamingChatId] = useState<string | null>(null)
-  const [renameValue, setRenameValue] = useState('')
+  const [recentlyDeletedChat, setRecentlyDeletedChat] = useState<Chat | null>(null)
+  const deleteTimeoutRef = useRef<number | null>(null)
 
   // Function to read from clipboard and set input
   const addSystemMessage = (text: string) => {
@@ -180,7 +181,7 @@ function App() {
           {sortedChats.map(chat => (
             <div
               key={chat.id}
-              className={`chat-item ${chat.id === activeChatId ? 'active' : ''}`}
+              className={`chat-item ${chat.id === activeChatId ? 'active' : ''}${chat.isDeleting ? 'chat-deleting' : ''}`}
               onClick={() => {
                 if (renamingChatId) return
                 setActiveChatId(chat.id)
@@ -311,7 +312,34 @@ function App() {
             <span>Rename</span>
           </div>
 
-          <div className="context-item">
+          <div 
+            className="context-item"
+            onClick={() => {
+              const chat = chats.find(c => c.id === chatContextMenu.chatId)
+              if (!chat) return
+
+              // Mark as deleting for animation
+              setChats(prev =>
+                prev.map(c =>
+                  c.id === chat.id ? { ...c, isDeleting: true } : c
+                )
+              )
+
+              // Clear active chat if needed
+              if(activeChatId === chat.id)
+                setActiveChatId(null)
+
+              setChatContextMenu(null)
+              setRecentlyDeletedChat(chat)
+
+              // Final removal after animation
+              deleteTimeoutRef.current = window.setTimeout(() => {
+                setChats(prev => prev.filter(c => c.id !== chat.id))
+                setRecentlyDeletedChat(null)
+                deleteTimeoutRef.current = null
+              }, 4000)
+            }}
+          >
             <Trash2 size={18} />
             <span>Delete</span>
           </div>
@@ -320,6 +348,32 @@ function App() {
             <X size={18} />
             <span>Deselect</span>
           </div>
+        </div>
+      )}
+
+      {recentlyDeletedChat && (
+        <div className="undo-toast">
+          <span>Chat deleted</span>
+          <button
+            onClick={() => {
+              if (deleteTimeoutRef.current) {
+                clearTimeout(deleteTimeoutRef.current)
+                deleteTimeoutRef.current = null
+              }
+
+              setChats(prev =>
+                prev.map(c =>
+                  c.id === recentlyDeletedChat.id
+                    ? { ...c, isDeleting: false }
+                    : c
+                )
+              )
+
+              setRecentlyDeletedChat(null)
+            }}
+          >
+            Undo
+          </button>
         </div>
       )}
     </div>
