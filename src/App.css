@@ -131,3 +131,63 @@
   transition: max-width 0.2s ease;
   align-items: stretch;
 }
+
+/* Context menu */
+.chat-context-menu {
+  position: fixed;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 6px;
+  z-index: 1000;
+  min-width: 160px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.chat-context-menu .context-item {
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  user-select: none;
+}
+
+.chat-context-menu .context-item:hover {
+  background: #222;
+}
+
+.context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  user-select: none;
+}
+
+.context-item svg {
+  opacity: 0.4;
+}
+
+.context-item:hover svg {
+  opacity: 1;
+}
+
+.context-item:hover {
+  background: #222;
+}
+
+.chat-context-menu {
+  animation: contextFadeIn 0.12s ease-out;
+}
+
+@keyframes contextFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

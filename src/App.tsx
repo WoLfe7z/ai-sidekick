@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
+import { Star, Pencil, Trash2, X } from 'lucide-react' 
 
 // Chat history
 import { Chat, Message } from './types/chat'
@@ -11,6 +12,12 @@ function App() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const isExplainingRef = useRef(false)
   const activeChatIdRef = useRef<string | null>(null)
+
+  const [chatContextMenu, setChatContextMenu] = useState<{
+    x: number
+    y: number
+    chatId: string
+  } | null>(null)
 
   // Function to read from clipboard and set input
   const addSystemMessage = (text: string) => {
@@ -107,6 +114,20 @@ function App() {
     }
   }, [])
 
+  // Context menu
+  useEffect(() => {
+    const close = () => setChatContextMenu(null)
+
+    window.addEventListener('click', close)
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape') close()
+    })
+
+    return () => {
+      window.removeEventListener('click', close)
+    }
+  }, [])
+
   const activeChat = chats.find(c => c.id === activeChatId)
 
   return (
@@ -128,10 +149,16 @@ function App() {
           {chats.map(chat => (
             <div
               key={chat.id}
-              className={`chat-item ${
-                chat.id === activeChatId ? 'active' : ''
-              }`}
+              className={`chat-item ${chat.id === activeChatId ? 'active' : ''}`}
               onClick={() => setActiveChatId(chat.id)}
+              onContextMenu={e => {
+                e.preventDefault()
+                setChatContextMenu({
+                  x: e.clientX,
+                  y: e.clientY,
+                  chatId: chat.id
+                })
+              }}
             >
               <div className="chat-title">{chat.title}</div>
             </div>
@@ -156,6 +183,22 @@ function App() {
           ))}
         </div>
       </div>
+
+      {chatContextMenu && (
+        <div
+          className="chat-context-menu"
+          style={{
+            top: chatContextMenu.y,
+            left: chatContextMenu.x
+          }}
+          onClick={() => setChatContextMenu(null)}
+        >
+          <div className="context-item"><Star size={18} /><span>Favorite</span></div>
+          <div className="context-item"><Pencil size={18} /><span>Rename</span></div>
+          <div className="context-item"><Trash2 size={18} /><span>Delete</span></div>
+          <div className="context-item"><X size={18} /><span>Deselect</span></div>
+        </div>
+      )}
     </div>
   )
 }
