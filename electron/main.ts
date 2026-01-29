@@ -1,13 +1,18 @@
 import 'dotenv/config'
-import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, Event } from 'electron'
+import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import OpenAI from 'openai'
+import { get } from 'node:http'
 
 let win: BrowserWindow | null = null
 let tray: Tray | null = null
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.yourname.ai-sidekick')
+}
 
 // ---------------- AI SETUP ----------------
 const openai = new OpenAI({
@@ -39,7 +44,7 @@ ipcMain.handle('ai:explain', async (_event, text: string) => {
 // ---------------- WINDOW ----------------
 function createWindow() {
   win = new BrowserWindow({
-    icon: path.join(__dirname, '../public/electron-vite.svg'),
+    icon: getTrayIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs')
     }
@@ -58,9 +63,26 @@ function createWindow() {
 }
 
 // ---------------- TRAY ----------------
+function getTrayIconPath() {
+  // DEV: load from source public folder
+  if (process.env.VITE_DEV_SERVER_URL) {
+    return path.join(process.cwd(), 'public', 'sidekick-tray-icon.ico')
+  }
+
+  // PROD: load from bundled electron output
+  return path.join(__dirname, 'sidekick-tray-icon.ico')
+}
+
 function createTray() {
-  const iconPath = path.join(__dirname, '../public/electron-vite.svg')
-  tray = new Tray(iconPath)
+  const iconPath = getTrayIconPath()
+  const trayIcon = nativeImage.createFromPath(iconPath)
+
+  if (trayIcon.isEmpty()) {
+    console.error('Tray icon failed to load.')
+    return
+  }
+
+  tray = new Tray(trayIcon)
 
   const trayMenu = Menu.buildFromTemplate([
     {
@@ -106,8 +128,8 @@ app.whenReady().then(() => {
   )
 })
 
-app.on('window-all-closed', (event: Event) => {
-  event.preventDefault()
+app.on('window-all-closed', () => {
+  // Prevent the app from closing when all windows are closed
 })
 
 app.on('will-quit', () => {

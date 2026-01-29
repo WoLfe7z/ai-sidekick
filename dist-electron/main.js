@@ -2,7 +2,7 @@ import require$$0 from "fs";
 import require$$1 from "path";
 import require$$2 from "os";
 import require$$3 from "crypto";
-import { ipcMain, app, globalShortcut, BrowserWindow, Tray, Menu } from "electron";
+import { app, ipcMain, globalShortcut, BrowserWindow, nativeImage, Tray, Menu } from "electron";
 import { fileURLToPath } from "node:url";
 import path$2 from "node:path";
 var main = { exports: {} };
@@ -6957,6 +6957,9 @@ OpenAI.Videos = Videos;
 let win = null;
 let tray = null;
 const __dirname$1 = path$2.dirname(fileURLToPath(import.meta.url));
+if (process.platform === "win32") {
+  app.setAppUserModelId("com.yourname.ai-sidekick");
+}
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
@@ -6981,7 +6984,7 @@ ipcMain.handle("ai:explain", async (_event, text) => {
 });
 function createWindow() {
   win = new BrowserWindow({
-    icon: path$2.join(__dirname$1, "../public/electron-vite.svg"),
+    icon: getTrayIconPath(),
     webPreferences: {
       preload: path$2.join(__dirname$1, "preload.mjs")
     }
@@ -6996,9 +6999,20 @@ function createWindow() {
     win.loadFile(path$2.join(__dirname$1, "../dist/index.html"));
   }
 }
+function getTrayIconPath() {
+  if (process.env.VITE_DEV_SERVER_URL) {
+    return path$2.join(process.cwd(), "public", "sidekick-tray-icon.ico");
+  }
+  return path$2.join(__dirname$1, "sidekick-tray-icon.ico");
+}
 function createTray() {
-  const iconPath = path$2.join(__dirname$1, "../public/electron-vite.svg");
-  tray = new Tray(iconPath);
+  const iconPath = getTrayIconPath();
+  const trayIcon = nativeImage.createFromPath(iconPath);
+  if (trayIcon.isEmpty()) {
+    console.error("Tray icon failed to load.");
+    return;
+  }
+  tray = new Tray(trayIcon);
   const trayMenu = Menu.buildFromTemplate([
     {
       label: "Show AI Sidekick",
@@ -7036,8 +7050,7 @@ app.whenReady().then(() => {
     success ? "✅ Global shortcut registered" : "❌ Failed to register global shortcut"
   );
 });
-app.on("window-all-closed", (event) => {
-  event.preventDefault();
+app.on("window-all-closed", () => {
 });
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
