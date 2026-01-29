@@ -1,56 +1,88 @@
 import { useState, useEffect } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/electron-vite.animate.svg'
 import './App.css'
 
+// Chat history
+import { Chat, Message } from './types/chat'
+import { createNewChat, addMessageToChat } from './state/chatStore'
+
 function App() {
-  const [input, setInput] = useState("")
-  const [output, setOutput] = useState("")
-  const [loading, setLoading] = useState(false)
+  // Chat state
+  const [chats, setChats] = useState<Chat[]>([])
+  const [activeChatId, setActiveChatId] = useState<string | null>(null)
 
   // Function to read from clipboard and set input
+  const addSystemMessage = (text: string) => {
+    const systemMessage: Message = {
+      id: crypto.randomUUID(),
+      role: 'system',
+      content: text,
+      timestamp: Date.now()
+    }
+
+    if (!activeChatId) {
+      const newChat = createNewChat(systemMessage)
+      setChats([newChat])
+      setActiveChatId(newChat.id)
+      return
+    }
+
+    setChats(prev =>
+      addMessageToChat(prev, activeChatId, systemMessage)
+    )
+  }
+
   const handleExplainClipboard = async () => {
     try {
       const clipboardText = await navigator.clipboard.readText()
 
-      if(!clipboardText.trim()) {
-        setOutput("Clipboard is empty.")
+      if (!clipboardText.trim()) {
+        addSystemMessage("📋 Clipboard is empty.")
         return
       }
 
-      setInput("")    // Clear previous input
-      setTimeout(() => {
-        setInput(clipboardText)
-      }, 0) // Ensure state update
-      
       await handleExplain(clipboardText)
     } catch (err) {
-      setOutput("Failed to read clipboard: " + (err as Error).message)
+      addSystemMessage(
+        "⚠️ Failed to read clipboard: " + (err as Error).message
+      )
     }
   }
 
-  const handleExplain = async (overrideText?: string) => {
-    const textToExplain = overrideText ?? input
+  const handleExplain = async (text: string) => {
+    if (!text.trim()) return
 
-    if (!textToExplain.trim()) {
-      setOutput("No text available to explain from clipboard.")
-      return
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: text,
+      timestamp: Date.now()
     }
 
-    setLoading(true)
-    setOutput("")
+    let chatId = activeChatId
 
-    try {
-      // @ts-ignore
-      const result = await window.ai.explainText(textToExplain)
-      setOutput(result)
+    // Create chat if none exists
+    if (!chatId) {
+      const newChat = createNewChat(userMessage)
+      setChats([newChat])
+      setActiveChatId(newChat.id)
+      chatId = newChat.id
+    } else {
+      setChats(prev => addMessageToChat(prev, chatId!, userMessage))
     }
-    catch (err) {
-      setOutput("Error occurred: " + (err as Error).message)
-    } finally {
-      setLoading(false)
+
+    // Call AI
+    const reply = await window.ai.explainText(text)
+
+    const assistantMessage: Message = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: reply,
+      timestamp: Date.now()
     }
+
+    setChats(prev => addMessageToChat(prev, chatId!, assistantMessage))
   }
+
 
   useEffect(() => {
     const handleHotKey = async () => {
@@ -66,34 +98,57 @@ function App() {
     }
   }, [])
 
+  const activeChat = chats.find(c => c.id === activeChatId)
+
   return (
-    <>
-      <div>
-        <a href="https://electron-vite.github.io" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <textarea
-        placeholder="Paste code, errors, or text here..."
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-      />
-      <div className="card">
-        <button onClick={() => handleExplain()} disabled={loading}>
-          {loading ? "Loading..." : "Explain Text"}
+    <div className="app">
+      {/* Sidebar */}
+      <div className="sidebar">
+        <button
+          className="new-chat"
+          onClick={() => {
+            const newChat = createNewChat()
+            setChats(prev => [newChat, ...prev])
+            setActiveChatId(newChat.id)
+          }}
+        >
+          + New Chat
         </button>
 
-        <button onClick={handleExplainClipboard}>
-          Explain Clipboard
-        </button>
+        <div className="chat-list">
+          {chats.map(chat => (
+            <div
+              key={chat.id}
+              className={`chat-item ${
+                chat.id === activeChatId ? 'active' : ''
+              }`}
+              onClick={() => setActiveChatId(chat.id)}
+            >
+              <div className="chat-title">{chat.title}</div>
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="output">
-        {output}
+
+      {/* Main chat area */}
+      <div className="chat">
+        {!activeChat && (
+          <div className="empty">
+            <p>No chat selected.</p>
+            <p>Press <b>Ctrl + Alt + E</b> or create a new chat.</p>
+          </div>
+        )}
+
+        {activeChat?.messages.map(msg => (
+          <div key={msg.id} className={`msg ${msg.role}`}>
+            {msg.role !== 'system' && (
+              <strong>{msg.role === 'user' ? 'You' : 'AI'}:</strong>
+            )}
+            <div>{msg.content}</div>
+          </div>
+        ))}
       </div>
-    </>
+    </div>
   )
 }
 
