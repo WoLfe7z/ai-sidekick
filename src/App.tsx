@@ -24,6 +24,14 @@ function App() {
   const [recentlyDeletedChat, setRecentlyDeletedChat] = useState<Chat | null>(null)
   const deleteTimeoutRef = useRef<number | null>(null)
 
+  // Shortcuts
+  const SHORTCUTS = {
+    favorite: 'f',
+    rename : 'r',
+    delete : 'delete',
+    deselect : 'escape'
+  } as const
+
   // Function to read from clipboard and set input
   const addSystemMessage = (text: string) => {
     const systemMessage: Message = {
@@ -102,6 +110,32 @@ function App() {
     setChats(prev => addMessageToChat(prev, chatId!, assistantMessage))
   }
 
+  // Delete chat function extracted for reuse
+  const deleteChatById = (chatId: string) => {
+    const chat = chats.find(c => c.id === chatId)
+    if (!chat) return
+
+    // Mark as deleting for animation
+    setChats(prev =>
+      prev.map(c =>
+        c.id === chat.id ? { ...c, isDeleting: true } : c
+      )
+    )
+
+    // Clear active chat if needed
+    if (activeChatId === chat.id) {
+      setActiveChatId(null)
+    }
+
+    setRecentlyDeletedChat(chat)
+
+    deleteTimeoutRef.current = window.setTimeout(() => {
+      setChats(prev => prev.filter(c => c.id !== chat.id))
+      setRecentlyDeletedChat(null)
+      deleteTimeoutRef.current = null
+    }, 4000)
+  }
+
   // --------- Effects ---------
   useEffect(() => {
     activeChatIdRef.current = activeChatId
@@ -125,7 +159,7 @@ function App() {
 
     window.addEventListener('click', close)
     window.addEventListener('keydown', e => {
-      if (e.key === 'Escape') close()
+      if (e.key === 'Escape' && chatContextMenu) close()
     })
 
     return () => {
@@ -153,6 +187,52 @@ function App() {
       sel?.addRange(range)
     })
   }, [renamingChatId])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in an editable field
+      const target = e.target as HTMLElement
+      if (target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(target.tagName)) return
+      if (!activeChatId) return
+
+      // Handle keyboard shortcuts for active chat
+      const key = e.key.toLowerCase()
+      switch (key) {
+        case SHORTCUTS.favorite:
+          e.preventDefault()
+          setChats(prev =>
+            prev.map(c =>
+              c.id === activeChatId
+                ? { ...c, favorite: !c.favorite }
+                : c
+            )
+          )
+          break
+
+        case SHORTCUTS.rename:
+          e.preventDefault()
+          setRenamingChatId(activeChatId)
+          break
+
+
+
+        case SHORTCUTS.deselect:
+          e.preventDefault()
+          setActiveChatId(null)
+          break
+          
+        case 'delete':
+        case 'backspace':     // for Mac keyboards
+          e.preventDefault()
+          deleteChatById(activeChatId)
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeChatId, chats])
+
 
   const activeChat = chats.find(c => c.id === activeChatId)
 
@@ -257,18 +337,24 @@ function App() {
       {/* Main chat area */}
       <div className="chat">
         <div className="chat-inner">
-          {activeChat?.messages.map(msg => (
-            <div key={msg.id} className={`msg-row ${msg.role}`}>
-              <div className="msg-bubble">
-                {msg.role !== 'system' && (
-                  <div className="msg-author">
-                    {msg.role === 'user' ? 'You' : 'AI'}
-                  </div>
-                )}
-                <div className="msg-content">{msg.content}</div>
+          {activeChat ? (
+            activeChat.messages.map(msg => (
+              <div key={msg.id} className={`msg-row ${msg.role}`}>
+                <div className="msg-bubble">
+                  {msg.role !== 'system' && (
+                    <div className="msg-author">
+                      {msg.role === 'user' ? 'You' : 'AI'}
+                    </div>
+                  )}
+                  <div className="msg-content">{msg.content}</div>
+                </div>
               </div>
+            ))
+          ) : (
+            <div className="chat-empty">
+              Select a chat or create a new one
             </div>
-          ))}
+          )}
         </div>
       </div>
 
@@ -282,71 +368,68 @@ function App() {
           }}
           onClick={() => setChatContextMenu(null)}
         >
-          <div
-            className="context-item"
-            onClick={() => {
-              setChats(prev =>
-                prev.map(c =>
-                  c.id === chatContextMenu.chatId
-                    ? { ...c, favorite: !c.favorite }
-                    : c
+          <div className='context-item'>
+            <div
+              className="context-left"
+              onClick={() => {
+                setChats(prev =>
+                  prev.map(c =>
+                    c.id === chatContextMenu.chatId
+                      ? { ...c, favorite: !c.favorite }
+                      : c
+                  )
                 )
-              )
-              setChatContextMenu(null)
-            }}
-          >
-            <Star size={18} />
-            <span>Favorite</span>
+                setChatContextMenu(null)
+              }}
+            >
+              <Star size={18} />
+              <span>Favorite</span>
+            </div>  
+            <span className='context-shortcut'>{SHORTCUTS.favorite.toUpperCase()}</span>          
           </div>
 
-          <div
-            className="context-item"
-            onClick={() => {
-              const chat = chats.find(c => c.id === chatContextMenu.chatId)
-              if (!chat) return
-              setRenamingChatId(chat.id)
-              setChatContextMenu(null)
-            }}
-          >
-            <Pencil size={18} />
-            <span>Rename</span>
+          <div className='context-item'>
+            <div
+              className="context-left"
+              onClick={() => {
+                const chat = chats.find(c => c.id === chatContextMenu.chatId)
+                if (!chat) return
+                setRenamingChatId(chat.id)
+                setChatContextMenu(null)
+              }}
+            >
+              <Pencil size={18} />
+              <span>Rename</span>
+            </div>  
+            <span className='context-shortcut'>{SHORTCUTS.rename.toUpperCase()}</span>          
           </div>
 
-          <div 
-            className="context-item"
-            onClick={() => {
-              const chat = chats.find(c => c.id === chatContextMenu.chatId)
-              if (!chat) return
+          <div className='context-item'>
+            <div 
+              className="context-left"
+              onClick={() => {
+                deleteChatById(chatContextMenu.chatId)
+                setChatContextMenu(null)
+              }}
+            >
+              <Trash2 size={18} />
+              <span>Delete</span>
+            </div>            
+            <span className='context-shortcut'>{SHORTCUTS.delete.toUpperCase()}</span>          
+          </div>
 
-              // Mark as deleting for animation
-              setChats(prev =>
-                prev.map(c =>
-                  c.id === chat.id ? { ...c, isDeleting: true } : c
-                )
-              )
-
-              // Clear active chat if needed
-              if(activeChatId === chat.id)
+          <div className='context-item'>
+            <div 
+              className="context-left"
+              onClick={() => {
                 setActiveChatId(null)
-
-              setChatContextMenu(null)
-              setRecentlyDeletedChat(chat)
-
-              // Final removal after animation
-              deleteTimeoutRef.current = window.setTimeout(() => {
-                setChats(prev => prev.filter(c => c.id !== chat.id))
-                setRecentlyDeletedChat(null)
-                deleteTimeoutRef.current = null
-              }, 4000)
-            }}
-          >
-            <Trash2 size={18} />
-            <span>Delete</span>
-          </div>
-
-          <div className="context-item">
-            <X size={18} />
-            <span>Deselect</span>
+                setChatContextMenu(null)
+              }}
+            >
+              <X size={18} />
+              <span>Deselect</span>
+            </div> 
+            <span className='context-shortcut'>{SHORTCUTS.deselect.toUpperCase()}</span>           
           </div>
         </div>
       )}
