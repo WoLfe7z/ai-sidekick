@@ -227,3 +227,80 @@
     opacity: 0;
   }
 }
+
+/* Chat favourite star */
+.chat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.chat-title-wrapper {
+  flex: 1;
+  min-width: 0; /* REQUIRED for ellipsis */
+}
+
+.chat-fav-icon {
+  transform-origin: center;
+  flex-shrink: 0;
+  margin-left: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  color: #9ca3af; /* neutral when not favorite */
+}
+
+/* Show on hover */
+.chat-item:hover .chat-fav-icon {
+  opacity: 0.2;
+}
+
+.chat-item:hover .chat-fav-icon.chat-fav-icon.is-favorite {
+  opacity: 0.95;
+}
+
+/* Always visible & gold when favorited */
+.chat-fav-icon.is-favorite {
+  opacity: 1;
+  color: #facc15;
+}
+
+/* Favorite star animation */
+.fav-pop {
+  animation: starPop 0.18s ease-out;
+}
+
+@keyframes starPop {
+  0% {
+    transform: scale(0.6) rotate(-10deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.25) rotate(5deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* Unfavorite star animation */
+.fav-burst {
+  animation: starBurst 0.18s ease-in;
+}
+
+@keyframes starBurst {
+  0% {
+    transform: scale(1) rotate(-10deg);
+    opacity: 1;
+  }
+  60% {
+    transform: scale(1.15) rotate(5deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(0.4) rotate(0deg);
+    opacity: 0;
+  }
+}

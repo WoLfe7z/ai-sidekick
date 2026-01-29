@@ -155,6 +155,12 @@ function App() {
 
   const activeChat = chats.find(c => c.id === activeChatId)
 
+  const sortedChats = [...chats].sort((a, b) => {
+    if (a.favorite && !b.favorite) return -1
+    if (!a.favorite && b.favorite) return 1
+    return 0
+  })
+
   return (
     <div className="app">
       {/* Sidebar */}
@@ -171,7 +177,7 @@ function App() {
         </button>
 
         <div className="chat-list">
-          {chats.map(chat => (
+          {sortedChats.map(chat => (
             <div
               key={chat.id}
               className={`chat-item ${chat.id === activeChatId ? 'active' : ''}`}
@@ -188,39 +194,60 @@ function App() {
                 })
               }}
             >
-              {renamingChatId === chat.id ? (
-                <span
-                  className="chat-title chat-title-editing"
-                  contentEditable
-                  suppressContentEditableWarning
-                  autoFocus
-                  onBlur={e => {
-                    const value = e.currentTarget.textContent?.trim()
-                    if (value) {
-                      setChats(prev =>
-                        prev.map(c =>
-                          c.id === chat.id ? { ...c, title: value } : c
-                        )
+              <div className="chat-row">
+                <div className="chat-title-wrapper">
+                  {renamingChatId === chat.id ? (
+                    <span
+                      className="chat-title chat-title-editing"
+                      contentEditable
+                      suppressContentEditableWarning
+                      autoFocus
+                      onBlur={e => {
+                        const value = e.currentTarget.textContent?.trim()
+                        if (value) {
+                          setChats(prev =>
+                            prev.map(c =>
+                              c.id === chat.id ? { ...c, title: value } : c
+                            )
+                          )
+                        }
+                        setRenamingChatId(null)
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          e.currentTarget.blur()
+                        }
+                        if (e.key === 'Escape') {
+                          e.currentTarget.textContent = chat.title
+                          setRenamingChatId(null)
+                        }
+                      }}
+                    >
+                      {chat.title}
+                    </span>
+                  ) : (
+                    <div className="chat-title">{chat.title}</div>
+                  )}
+                </div>
+
+                <Star
+                  size={14}
+                  className={`chat-fav-icon ${
+                    chat.favorite ? 'is-favorite fav-pop' : 'fav-burst'
+                  }`}
+                  onClick={e => {
+                    e.stopPropagation()
+                    setChats(prev =>
+                      prev.map(c =>
+                        c.id === chat.id
+                          ? { ...c, favorite: !c.favorite }
+                          : c
                       )
-                    }
-                    setRenamingChatId(null)
+                    )
                   }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      e.currentTarget.blur()
-                    }
-                    if (e.key === 'Escape') {
-                      e.currentTarget.textContent = chat.title
-                      setRenamingChatId(null)
-                    }
-                  }}
-                >
-                  {chat.title}
-                </span>
-              ) : (
-                <div className="chat-title">{chat.title}</div>
-              )}
+                />
+              </div>
             </div>
           ))}
         </div>
@@ -244,6 +271,7 @@ function App() {
         </div>
       </div>
 
+      {/* Chat context menu */}
       {chatContextMenu && (
         <div
           className="chat-context-menu"
@@ -253,22 +281,45 @@ function App() {
           }}
           onClick={() => setChatContextMenu(null)}
         >
-          <div className="context-item"><Star size={18} /><span>Favorite</span></div>
-          <div 
-            className="context-item" onClick={() => {
-              const chat = chats.find(c => c.id === chatContextMenu.chatId)
-              if(!chat) return
+          <div
+            className="context-item"
+            onClick={() => {
+              setChats(prev =>
+                prev.map(c =>
+                  c.id === chatContextMenu.chatId
+                    ? { ...c, favorite: !c.favorite }
+                    : c
+                )
+              )
+              setChatContextMenu(null)
+            }}
+          >
+            <Star size={18} />
+            <span>Favorite</span>
+          </div>
 
+          <div
+            className="context-item"
+            onClick={() => {
+              const chat = chats.find(c => c.id === chatContextMenu.chatId)
+              if (!chat) return
               setRenamingChatId(chat.id)
-              setRenameValue(chat.title)
               setChatContextMenu(null)
             }}
           >
             <Pencil size={18} />
             <span>Rename</span>
           </div>
-          <div className="context-item"><Trash2 size={18} /><span>Delete</span></div>
-          <div className="context-item"><X size={18} /><span>Deselect</span></div>
+
+          <div className="context-item">
+            <Trash2 size={18} />
+            <span>Delete</span>
+          </div>
+
+          <div className="context-item">
+            <X size={18} />
+            <span>Deselect</span>
+          </div>
         </div>
       )}
     </div>
