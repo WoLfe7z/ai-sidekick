@@ -18,6 +18,7 @@ function App() {
   const [chats, setChats] = useState<Chat[]>([])
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [isTyping, setIsTyping] = useState(false)
+  const [userIsTyping, setUserIsTyping] = useState(false)
   const [messageInput, setMessageInput] = useState('')
   const isExplainingRef = useRef(false)
   const activeChatIdRef = useRef<string | null>(null)
@@ -154,6 +155,7 @@ function App() {
     
     const message = messageInput.trim()
     setMessageInput('') // Clear input immediately
+    setUserIsTyping(false) // Clear typing indicator
     
     await handleExplain(message)
   }
@@ -438,6 +440,15 @@ function App() {
                         </div>
                       </div>
                     ))}
+                    {userIsTyping && (
+                      <div className="typing-indicator user-typing">
+                        <div className="typing-bubble user-typing-bubble">
+                          <div className="typing-dot"></div>
+                          <div className="typing-dot"></div>
+                          <div className="typing-dot"></div>
+                        </div>
+                      </div>
+                    )}
                     {isTyping && (
                       <div className="typing-indicator">
                         <div className="typing-bubble">
@@ -541,7 +552,14 @@ function App() {
                   className="message-input"
                   placeholder="Type a message..."
                   value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
+                  onChange={(e) => {
+                    setMessageInput(e.target.value)
+                    if (e.target.value.trim() && !userIsTyping) {
+                      setUserIsTyping(true)
+                    } else if (!e.target.value.trim() && userIsTyping) {
+                      setUserIsTyping(false)
+                    }
+                  }}
                   onKeyDown={handleKeyDown}
                   disabled={isTyping}
                   rows={1}
