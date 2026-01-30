@@ -3,7 +3,21 @@ import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage } 
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import OpenAI from 'openai'
-import { get } from 'node:http'
+import Store from 'electron-store'
+import {
+  initializeDatabase,
+  saveChat,
+  updateChat,
+  deleteChat,
+  loadChats,
+  loadChat,
+  saveMessage,
+  loadMessages,
+  saveReaction,
+  loadReactions,
+  clearAll,
+  closeDatabase
+} from './database.js' // .js extension for ESM
 
 let win: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -13,6 +27,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 if (process.platform === 'win32') {
   app.setAppUserModelId('com.yourname.ai-sidekick')
 }
+
+// ---------------- STORAGE SETUP ----------------
+const store = new Store()
 
 // ---------------- AI SETUP ----------------
 const openai = new OpenAI({
@@ -41,6 +58,151 @@ ipcMain.handle('ai:explain', async (_event, text: string) => {
   }
 })
 
+// ---------------- DATABASE IPC HANDLERS ----------------
+
+// Initialize database
+ipcMain.handle('db:initialize', async () => {
+  try {
+    initializeDatabase()
+    return { success: true }
+  } catch (error) {
+    console.error('Error initializing database:', error)
+    throw error
+  }
+})
+
+// Chat operations
+ipcMain.handle('db:saveChat', async (_event, chat) => {
+  try {
+    saveChat(chat)
+    return { success: true }
+  } catch (error) {
+    console.error('Error saving chat:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('db:updateChat', async (_event, chatId, updates) => {
+  try {
+    updateChat(chatId, updates)
+    return { success: true }
+  } catch (error) {
+    console.error('Error updating chat:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('db:deleteChat', async (_event, chatId) => {
+  try {
+    deleteChat(chatId)
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting chat:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('db:loadChats', async () => {
+  try {
+    return loadChats()
+  } catch (error) {
+    console.error('Error loading chats:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('db:loadChat', async (_event, chatId) => {
+  try {
+    return loadChat(chatId)
+  } catch (error) {
+    console.error('Error loading chat:', error)
+    throw error
+  }
+})
+
+// Message operations
+ipcMain.handle('db:saveMessage', async (_event, chatId, message) => {
+  try {
+    saveMessage(chatId, message)
+    return { success: true }
+  } catch (error) {
+    console.error('Error saving message:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('db:loadMessages', async (_event, chatId) => {
+  try {
+    return loadMessages(chatId)
+  } catch (error) {
+    console.error('Error loading messages:', error)
+    throw error
+  }
+})
+
+// Reaction operations
+ipcMain.handle('db:saveReaction', async (_event, messageId, reaction) => {
+  try {
+    saveReaction(messageId, reaction)
+    return { success: true }
+  } catch (error) {
+    console.error('Error saving reaction:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('db:loadReactions', async (_event, chatId) => {
+  try {
+    return loadReactions(chatId)
+  } catch (error) {
+    console.error('Error loading reactions:', error)
+    throw error
+  }
+})
+
+// Clear all data
+ipcMain.handle('db:clearAll', async () => {
+  try {
+    clearAll()
+    return { success: true }
+  } catch (error) {
+    console.error('Error clearing data:', error)
+    throw error
+  }
+})
+
+// ---------------- ELECTRON-STORE IPC HANDLERS ----------------
+
+// Synchronous store operations (for shortcuts and preferences)
+ipcMain.on('store:get', (event, key) => {
+  event.returnValue = store.get(key)
+})
+
+ipcMain.on('store:set', (event, key, value) => {
+  store.set(key, value)
+  event.returnValue = { success: true }
+})
+
+ipcMain.on('store:delete', (event, key) => {
+  store.delete(key)
+  event.returnValue = { success: true }
+})
+
+ipcMain.on('store:clear', (event) => {
+  store.clear()
+  event.returnValue = { success: true }
+})
+
+// Async store operations
+ipcMain.handle('store:get-async', async (_event, key) => {
+  return store.get(key)
+})
+
+ipcMain.handle('store:set-async', async (_event, key, value) => {
+  store.set(key, value)
+  return { success: true }
+})
+
 // ---------------- WINDOW ----------------
 function createWindow() {
   win = new BrowserWindow({
@@ -52,7 +214,8 @@ function createWindow() {
     fullscreenable: false,
     icon: getTrayIconPath(),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs')
+      contextIsolation: false,
+      nodeIntegration: true
     }
   })
 
@@ -67,6 +230,10 @@ function createWindow() {
     win.loadURL(process.env.VITE_DEV_SERVER_URL)
   } else {
     win.loadFile(path.join(__dirname, '../dist/index.html'))
+  }
+
+  if (!app.isPackaged) {
+    win.webContents.openDevTools({ mode: 'detach' })
   }
 }
 
@@ -121,6 +288,9 @@ function createTray() {
 
 // ---------------- APP LIFECYCLE ----------------
 app.whenReady().then(() => {
+  // Initialize database FIRST
+  initializeDatabase()
+  
   createWindow()
   createTray()
 
@@ -142,4 +312,5 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll()
+  closeDatabase() // Clean up database connection
 })

@@ -286,18 +286,12 @@
   gap: 4px;
   margin-top: 6px;
   margin-left: 8px;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.2s ease;
 }
 
 .msg-row + .msg-actions {
   justify-content: flex-start;
-}
-
-/* Show actions on hover */
-.msg-row:hover + .msg-actions,
-.msg-actions:hover {
-  opacity: 1;
 }
 
 .msg-action-btn {

@@ -1,17 +1,193 @@
 import { useState, useEffect, useRef } from 'react'
-import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react' 
+import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, ChevronDown, Edit2, Check, GitBranch, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react' 
 import './styles/base.css'
 import './styles/sidebar.css'
 import './styles/chat.css'
 import './styles/context-menu.css'
 import './styles/shortcut.css'
+import './styles/message-search.css'
+import './styles/analytics.css'
 
 // Chat history
 import { Chat, Message } from './types/chat'
 import { createNewChat, addMessageToChat } from './state/chatStore'
 
+// Declare window.ai for TypeScript
+declare global {
+  interface Window {
+    ai: {
+      explainText: (text: string) => Promise<string>
+    }
+    require: any
+  }
+}
+
+// Setup window.ai wrapper
+if (typeof window !== 'undefined') {
+  window.ai = {
+    explainText: async (text: string) => {
+      const { ipcRenderer } = window.require('electron')
+      return await ipcRenderer.invoke('ai:explain', text)
+    }
+  }
+}
+
+// Storage utility class with database and electron-store
+class AppStorage {
+  // Initialize storage
+  static async initialize() {
+    const { ipcRenderer } = window.require('electron')
+    try {
+      await ipcRenderer.invoke('db:initialize')
+      console.log('✅ Database initialized')
+    } catch (error) {
+      console.error('❌ Failed to initialize database:', error)
+    }
+  }
+
+  // Save chat
+  static async saveChat(chat: Chat): Promise<void> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      await ipcRenderer.invoke('db:saveChat', chat)
+    } catch (error) {
+      console.error('❌ Failed to save chat:', error)
+    }
+  }
+
+  // Update chat
+  static async updateChat(chatId: string, updates: Partial<Chat>): Promise<void> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      await ipcRenderer.invoke('db:updateChat', chatId, updates)
+    } catch (error) {
+      console.error('❌ Failed to update chat:', error)
+    }
+  }
+
+  // Delete chat
+  static async deleteChat(chatId: string): Promise<void> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      await ipcRenderer.invoke('db:deleteChat', chatId)
+    } catch (error) {
+      console.error('❌ Failed to delete chat:', error)
+    }
+  }
+
+  // Load all chats
+  static async loadChats(): Promise<Chat[]> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      const chats = await ipcRenderer.invoke('db:loadChats')
+      return chats
+    } catch (error) {
+      console.error('❌ Failed to load chats:', error)
+      return []
+    }
+  }
+
+  // Load single chat with messages
+  static async loadChat(chatId: string): Promise<Chat | null> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      const chat = await ipcRenderer.invoke('db:loadChat', chatId)
+      return chat
+    } catch (error) {
+      console.error('❌ Failed to load chat:', error)
+      return null
+    }
+  }
+
+  // Save message
+  static async saveMessage(chatId: string, message: Message): Promise<void> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      await ipcRenderer.invoke('db:saveMessage', chatId, message)
+    } catch (error) {
+      console.error('❌ Failed to save message:', error)
+    }
+  }
+
+  // Save reaction
+  static async saveReaction(messageId: string, reaction: 'like' | 'dislike' | null): Promise<void> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      await ipcRenderer.invoke('db:saveReaction', messageId, reaction)
+    } catch (error) {
+      console.error('❌ Failed to save reaction:', error)
+    }
+  }
+
+  // Load reactions for a chat
+  static async loadReactions(chatId: string): Promise<{ [key: string]: 'like' | 'dislike' | null }> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      const reactions = await ipcRenderer.invoke('db:loadReactions', chatId)
+      return reactions
+    } catch (error) {
+      console.error('❌ Failed to load reactions:', error)
+      return {}
+    }
+  }
+
+  // Get shortcuts
+  static getShortcuts() {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      const shortcuts = ipcRenderer.sendSync('store:get', 'shortcuts')
+      return shortcuts || {
+        favorite: 'f',
+        rename: 'r',
+        delete: 'delete',
+        deselect: 'escape'
+      }
+    } catch (error) {
+      console.error('❌ Failed to load shortcuts:', error)
+      return {
+        favorite: 'f',
+        rename: 'r',
+        delete: 'delete',
+        deselect: 'escape'
+      }
+    }
+  }
+
+  // Save shortcuts
+  static saveShortcuts(shortcuts: any): void {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      ipcRenderer.send('store:set', 'shortcuts', shortcuts)
+    } catch (error) {
+      console.error('❌ Failed to save shortcuts:', error)
+    }
+  }
+
+  // Save branch data for a chat
+  static saveBranches(chatId: string, branches: any): void {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      ipcRenderer.send('store:set', `branches:${chatId}`, branches)
+    } catch (error) {
+      console.error('❌ Failed to save branches:', error)
+    }
+  }
+
+  // Load branch data for a chat
+  static loadBranches(chatId: string): any {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      const branches = ipcRenderer.sendSync('store:get', `branches:${chatId}`)
+      return branches || {}
+    } catch (error) {
+      console.error('❌ Failed to load branches:', error)
+      return {}
+    }
+  }
+}
+
 function App() {
-  type RightPanel = 'panel-chat' | 'panel-shortcuts'
+  type RightPanel = 'panel-chat' | 'panel-shortcuts' | 'panel-analytics'
   const [rightPanel, setRightPanel] = useState<RightPanel>('panel-chat')
 
   // Message reactions
@@ -19,22 +195,65 @@ function App() {
     [messageId: string]: 'like' | 'dislike' | null
   }>({})
 
+  // Message editing state
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [editingMessageContent, setEditingMessageContent] = useState('')
+
+  // Message branching state
+  // Structure: { messageIndex: { branches: Message[][], currentBranch: number } }
+  const [messageBranches, setMessageBranches] = useState<{
+    [messageIndex: number]: {
+      branches: Message[][]  // Each branch is an array of messages from that point forward
+      currentBranch: number
+    }
+  }>({})
+
   const handleCopyMessage = (content: string) => {
     navigator.clipboard.writeText(content)
   }
 
-  const handleLikeMessage = (messageId: string) => {
-    setMessageReactions(prev => ({
-      ...prev,
-      [messageId]: prev[messageId] === 'like' ? null : 'like'
-    }))
+  // Highlight search matches in message content
+  const highlightMatches = (text: string, isCurrentMatch: boolean) => {
+    if (!messageSearchQuery.trim()) return text
+    
+    const query = messageSearchQuery
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    const parts = text.split(regex)
+    
+    return (
+      <>
+        {parts.map((part, i) => 
+          regex.test(part) ? (
+            <mark 
+              key={i} 
+              className={isCurrentMatch ? 'search-match current-match' : 'search-match'}
+            >
+              {part}
+            </mark>
+          ) : (
+            part
+          )
+        )}
+      </>
+    )
   }
 
-  const handleDislikeMessage = (messageId: string) => {
+  const handleLikeMessage = async (messageId: string) => {
+    const newReaction = messageReactions[messageId] === 'like' ? null : 'like'
     setMessageReactions(prev => ({
       ...prev,
-      [messageId]: prev[messageId] === 'dislike' ? null : 'dislike'
+      [messageId]: newReaction
     }))
+    await AppStorage.saveReaction(messageId, newReaction)
+  }
+
+  const handleDislikeMessage = async (messageId: string) => {
+    const newReaction = messageReactions[messageId] === 'dislike' ? null : 'dislike'
+    setMessageReactions(prev => ({
+      ...prev,
+      [messageId]: newReaction
+    }))
+    await AppStorage.saveReaction(messageId, newReaction)
   }
 
   const handleRetryMessage = async (messageIndex: number) => {
@@ -51,10 +270,12 @@ function App() {
     setChats(prev =>
       prev.map(c => {
         if (c.id !== activeChatId) return c
-        return {
+        const updated = {
           ...c,
           messages: c.messages.slice(0, messageIndex)
         }
+        AppStorage.saveChat(updated) // Save to DB
+        return updated
       })
     )
     
@@ -78,6 +299,7 @@ function App() {
 
     // Add empty message
     setChats(prev => addMessageToChat(prev, activeChatId, assistantMessage))
+    await AppStorage.saveMessage(activeChatId, assistantMessage)
 
     // Stream the text character by character
     const chars = reply.split('')
@@ -99,6 +321,254 @@ function App() {
           }
         })
       )
+    }
+    
+    // Save final complete message
+    const finalMessage = { ...assistantMessage, content: reply }
+    await AppStorage.saveMessage(activeChatId, finalMessage)
+  }
+
+  const handleEditMessage = (messageId: string, currentContent: string) => {
+    setEditingMessageId(messageId)
+    setEditingMessageContent(currentContent)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null)
+    setEditingMessageContent('')
+  }
+
+  const handleSaveEdit = async (messageId: string, messageIndex: number) => {
+    if (!activeChatId || !editingMessageContent.trim()) return
+
+    const newContent = editingMessageContent.trim()
+    
+    // Update the user message
+    setChats(prev =>
+      prev.map(c => {
+        if (c.id !== activeChatId) return c
+        const updatedMessages = c.messages.slice(0, messageIndex + 1).map(msg =>
+          msg.id === messageId ? { ...msg, content: newContent } : msg
+        )
+        const updated = { ...c, messages: updatedMessages }
+        AppStorage.saveChat(updated)
+        return updated
+      })
+    )
+
+    // Clear editing state
+    setEditingMessageId(null)
+    setEditingMessageContent('')
+
+    // Regenerate AI response
+    setIsTyping(true)
+    const reply = await window.ai.explainText(newContent)
+    setIsTyping(false)
+
+    // Create assistant message
+    const assistantMessageId = crypto.randomUUID()
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now()
+    }
+
+    setChats(prev => addMessageToChat(prev, activeChatId, assistantMessage))
+
+    // Stream the response
+    const chars = reply.split('')
+    for (let i = 0; i < chars.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+      
+      setChats(prev => 
+        prev.map(chat => {
+          if (chat.id !== activeChatId) return chat
+          return {
+            ...chat,
+            messages: chat.messages.map(msg => {
+              if (msg.id !== assistantMessageId) return msg
+              return {
+                ...msg,
+                content: reply.substring(0, i + 1)
+              }
+            })
+          }
+        })
+      )
+    }
+
+    // Save final message
+    const finalMessage = { ...assistantMessage, content: reply }
+    await AppStorage.saveMessage(activeChatId, finalMessage)
+  }
+
+  // Create a new branch from a message
+  const handleCreateBranch = async (messageIndex: number) => {
+    if (!activeChatId || isTyping) return
+    
+    const chat = chats.find(c => c.id === activeChatId)
+    if (!chat) return
+
+    // Get messages up to and including the branch point
+    const baseMessages = chat.messages.slice(0, messageIndex + 1)
+    const remainingMessages = chat.messages.slice(messageIndex + 1)
+
+    // Initialize branch structure if it doesn't exist
+    if (!messageBranches[messageIndex]) {
+      setMessageBranches(prev => ({
+        ...prev,
+        [messageIndex]: {
+          branches: [remainingMessages], // Original path as first branch
+          currentBranch: 0
+        }
+      }))
+    }
+
+    // Add new empty branch
+    setMessageBranches(prev => ({
+      ...prev,
+      [messageIndex]: {
+        branches: [...(prev[messageIndex]?.branches || [remainingMessages]), []],
+        currentBranch: (prev[messageIndex]?.branches.length || 1)
+      }
+    }))
+
+    // Update chat to show only base messages
+    setChats(prev =>
+      prev.map(c => {
+        if (c.id !== activeChatId) return c
+        return {
+          ...c,
+          messages: baseMessages
+        }
+      })
+    )
+  }
+
+  // Navigate between branches
+  const handleSwitchBranch = (messageIndex: number, direction: 'prev' | 'next') => {
+    if (!activeChatId) return
+
+    const chat = chats.find(c => c.id === activeChatId)
+    if (!chat) return
+
+    const branchData = messageBranches[messageIndex]
+    if (!branchData) return
+
+    // Before switching, save the current branch's messages
+    const baseMessages = chat.messages.slice(0, messageIndex + 1)
+    const currentBranchMessages = chat.messages.slice(messageIndex + 1)
+    
+    setMessageBranches(prev => ({
+      ...prev,
+      [messageIndex]: {
+        ...prev[messageIndex],
+        branches: prev[messageIndex].branches.map((branch, i) => 
+          i === prev[messageIndex].currentBranch ? currentBranchMessages : branch
+        )
+      }
+    }))
+
+    const totalBranches = branchData.branches.length
+    let newBranchIndex = branchData.currentBranch
+
+    if (direction === 'next') {
+      newBranchIndex = (branchData.currentBranch + 1) % totalBranches
+    } else {
+      newBranchIndex = (branchData.currentBranch - 1 + totalBranches) % totalBranches
+    }
+
+    // Update current branch index
+    const updatedBranchData = {
+      ...branchData,
+      currentBranch: newBranchIndex,
+      branches: branchData.branches.map((branch, i) => 
+        i === branchData.currentBranch ? currentBranchMessages : branch
+      )
+    }
+
+    setMessageBranches(prev => ({
+      ...prev,
+      [messageIndex]: updatedBranchData
+    }))
+
+    // Update chat messages to show the selected branch
+    const branchMessages = updatedBranchData.branches[newBranchIndex]
+
+    setChats(prev =>
+      prev.map(c => {
+        if (c.id !== activeChatId) return c
+        return {
+          ...c,
+          messages: [...baseMessages, ...branchMessages]
+        }
+      })
+    )
+  }
+
+  // Get branch info for a message
+  const getBranchInfo = (messageIndex: number) => {
+    const branchData = messageBranches[messageIndex]
+    if (!branchData || branchData.branches.length <= 1) return null
+
+    return {
+      current: branchData.currentBranch + 1,
+      total: branchData.branches.length
+    }
+  }
+
+  // Analytics calculations
+  const getAnalytics = () => {
+    const totalChats = chats.length
+    const totalMessages = chats.reduce((sum, chat) => sum + chat.messages.length, 0)
+    const userMessages = chats.reduce((sum, chat) => 
+      sum + chat.messages.filter(m => m.role === 'user').length, 0)
+    const aiMessages = chats.reduce((sum, chat) => 
+      sum + chat.messages.filter(m => m.role === 'assistant').length, 0)
+    
+    // Estimate tokens (rough approximation: 1 token ≈ 4 characters)
+    const totalCharacters = chats.reduce((sum, chat) => 
+      sum + chat.messages.reduce((msgSum, msg) => msgSum + msg.content.length, 0), 0)
+    const estimatedTokens = Math.round(totalCharacters / 4)
+
+    // Current chat stats
+    const currentChatStats = activeChat ? {
+      messages: activeChat.messages.length,
+      userMessages: activeChat.messages.filter(m => m.role === 'user').length,
+      aiMessages: activeChat.messages.filter(m => m.role === 'assistant').length,
+      words: activeChat.messages.reduce((sum, msg) => 
+        sum + msg.content.split(/\s+/).filter(w => w.length > 0).length, 0),
+      characters: activeChat.messages.reduce((sum, msg) => sum + msg.content.length, 0),
+      estimatedTokens: Math.round(
+        activeChat.messages.reduce((sum, msg) => sum + msg.content.length, 0) / 4
+      )
+    } : null
+
+    // Activity by date
+    const messagesByDate: { [date: string]: number } = {}
+    chats.forEach(chat => {
+      chat.messages.forEach(msg => {
+        const date = new Date(msg.timestamp).toLocaleDateString()
+        messagesByDate[date] = (messagesByDate[date] || 0) + 1
+      })
+    })
+
+    const sortedDates = Object.entries(messagesByDate)
+      .sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime())
+      .slice(-7) // Last 7 days
+
+    return {
+      overall: {
+        totalChats,
+        totalMessages,
+        userMessages,
+        aiMessages,
+        estimatedTokens,
+        favoriteChats: chats.filter(c => c.favorite).length
+      },
+      currentChat: currentChatStats,
+      activity: sortedDates
     }
   }
 
@@ -157,13 +627,133 @@ function App() {
   const deleteTimeoutRef = useRef<number | null>(null)
 
   // Shortcuts
-  const [shortcuts, setShortcuts] = useState({
-    favorite: 'f',
-    rename : 'r',
-    delete : 'delete',
-    deselect : 'escape'
-  })
+  const [shortcuts, setShortcuts] = useState(() => AppStorage.getShortcuts())
   const [editingShortcut, setEditingShortcut] = useState<keyof typeof shortcuts | null>(null)
+
+  // Get active chat
+  const activeChat = chats.find(c => c.id === activeChatId)
+
+  // Message search state (must be after activeChat is defined)
+  const [messageSearchQuery, setMessageSearchQuery] = useState('')
+  const [messageSearchExpanded, setMessageSearchExpanded] = useState(false)
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0)
+  const messageSearchInputRef = useRef<HTMLInputElement>(null)
+  const matchedMessageRefs = useRef<HTMLDivElement[]>([])
+
+  // Get matched messages
+  const getMatchedMessages = () => {
+    if (!activeChat || !messageSearchQuery.trim()) return []
+    
+    const query = messageSearchQuery.toLowerCase()
+    return activeChat.messages
+      .map((msg, index) => ({ msg, index }))
+      .filter(({ msg }) => msg.content.toLowerCase().includes(query))
+  }
+
+  const matchedMessages = getMatchedMessages()
+  const totalMatches = matchedMessages.length
+
+  // Navigate to next/previous match
+  const navigateToMatch = (direction: 'next' | 'prev') => {
+    if (totalMatches === 0) return
+    
+    let newIndex = currentMatchIndex
+    if (direction === 'next') {
+      newIndex = (currentMatchIndex + 1) % totalMatches
+    } else {
+      newIndex = (currentMatchIndex - 1 + totalMatches) % totalMatches
+    }
+    
+    setCurrentMatchIndex(newIndex)
+    
+    // Scroll to matched message
+    const matchedElement = matchedMessageRefs.current[newIndex]
+    if (matchedElement) {
+      matchedElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+
+  // Reset search when chat changes
+  useEffect(() => {
+    setMessageSearchQuery('')
+    setMessageSearchExpanded(false)
+    setCurrentMatchIndex(0)
+  }, [activeChatId])
+
+  // Reset current match when query changes
+  useEffect(() => {
+    setCurrentMatchIndex(0)
+  }, [messageSearchQuery])
+
+  // Initialize database and load data
+  useEffect(() => {
+    const loadData = async () => {
+      await AppStorage.initialize()
+      const loadedChats = await AppStorage.loadChats()
+      setChats(loadedChats)
+    }
+    loadData()
+  }, [])
+
+  // Load messages and reactions when active chat changes
+  useEffect(() => {
+    const loadChatData = async () => {
+      if (!activeChatId) {
+        setMessageReactions({})
+        setMessageBranches({})
+        return
+      }
+
+      const chat = await AppStorage.loadChat(activeChatId)
+      if (chat) {
+        // Load branches first
+        const branches = AppStorage.loadBranches(activeChatId)
+        setMessageBranches(branches)
+
+        // If branches exist, reconstruct messages to show the current branch
+        if (Object.keys(branches).length > 0) {
+          // Find the earliest branch point
+          const branchIndices = Object.keys(branches).map(k => parseInt(k)).sort((a, b) => a - b)
+          const earliestBranch = branchIndices[0]
+          const branchData = branches[earliestBranch]
+          
+          if (branchData && branchData.branches && branchData.branches.length > 0) {
+            // Get base messages up to branch point
+            const baseMessages = chat.messages.slice(0, earliestBranch + 1)
+            // Get current branch messages
+            const currentBranchMessages = branchData.branches[branchData.currentBranch] || []
+            
+            // Update chat with reconstructed messages
+            const reconstructedChat = {
+              ...chat,
+              messages: [...baseMessages, ...currentBranchMessages]
+            }
+            setChats(prev => prev.map(c => c.id === activeChatId ? reconstructedChat : c))
+          } else {
+            setChats(prev => prev.map(c => c.id === activeChatId ? chat : c))
+          }
+        } else {
+          setChats(prev => prev.map(c => c.id === activeChatId ? chat : c))
+        }
+      }
+
+      const reactions = await AppStorage.loadReactions(activeChatId)
+      setMessageReactions(reactions)
+    }
+    loadChatData()
+  }, [activeChatId])
+
+  // Save shortcuts when they change
+  useEffect(() => {
+    AppStorage.saveShortcuts(shortcuts)
+  }, [shortcuts])
+
+  // Save branches when they change
+  useEffect(() => {
+    if (activeChatId && Object.keys(messageBranches).length > 0) {
+      AppStorage.saveBranches(activeChatId, messageBranches)
+    }
+  }, [messageBranches, activeChatId])
 
   // Function to read from clipboard and set input
   const addSystemMessage = (text: string) => {
@@ -176,12 +766,14 @@ function App() {
 
     if (!activeChatId) {
       const newChat = createNewChat(systemMessage)
-      setChats(prev => [newChat, ...prev]) // Append
+      setChats(prev => [newChat, ...prev])
       setActiveChatId(newChat.id)
+      AppStorage.saveChat(newChat) // Save to DB
       return
     }
 
     setChats(prev => addMessageToChat(prev, activeChatId, systemMessage))
+    AppStorage.saveMessage(activeChatId, systemMessage) // Save to DB
   }
 
   const handleExplainClipboard = async () => {
@@ -218,6 +810,7 @@ function App() {
       setActiveChatId(newChat.id)
       activeChatIdRef.current = newChat.id
       chatId = newChat.id
+      await AppStorage.saveChat(newChat) // Save to DB
     }
 
     const userMessage: Message = {
@@ -227,8 +820,9 @@ function App() {
       timestamp: Date.now()
     }
 
-    // Append message, DO NOT replace chats
+    // Append message
     setChats(prev => addMessageToChat(prev, chatId!, userMessage))
+    await AppStorage.saveMessage(chatId, userMessage) // Save to DB
 
     // Show typing indicator
     setIsTyping(true)
@@ -253,7 +847,7 @@ function App() {
     // Stream the text character by character
     const chars = reply.split('')
     for (let i = 0; i < chars.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 20)) // 20ms delay per character
+      await new Promise(resolve => setTimeout(resolve, 20))
       
       setChats(prev => 
         prev.map(chat => {
@@ -271,14 +865,48 @@ function App() {
         })
       )
     }
+    
+    // Save final complete message
+    const finalMessage = { ...assistantMessage, content: reply }
+    await AppStorage.saveMessage(chatId, finalMessage)
+
+    // Update branch structure if we're in a branch
+    const chat = chats.find(c => c.id === chatId)
+    if (!chat) return
+
+    // Find if we're at a branch point
+    for (const [indexStr, branchData] of Object.entries(messageBranches)) {
+      const index = parseInt(indexStr)
+      const baseMessages = chat.messages.slice(0, index + 1)
+      
+      // If our current messages start with this base, we're in this branch
+      if (chat.messages.length > baseMessages.length &&
+          chat.messages.slice(0, baseMessages.length).every((msg, i) => msg.id === baseMessages[i]?.id)) {
+        
+        // Get messages after the branch point
+        const branchMessages = chat.messages.slice(index + 1)
+        
+        // Update the current branch with new messages
+        setMessageBranches(prev => ({
+          ...prev,
+          [index]: {
+            ...prev[index],
+            branches: prev[index].branches.map((branch, i) => 
+              i === prev[index].currentBranch ? branchMessages : branch
+            )
+          }
+        }))
+        break
+      }
+    }
   }
 
   const handleSendMessage = async () => {
     if (!messageInput.trim() || isTyping) return
     
     const message = messageInput.trim()
-    setMessageInput('') // Clear input immediately
-    setUserIsTyping(false) // Clear typing indicator
+    setMessageInput('')
+    setUserIsTyping(false)
     
     await handleExplain(message)
   }
@@ -291,7 +919,7 @@ function App() {
   }
 
   // Delete chat function extracted for reuse
-  const deleteChatById = (chatId: string) => {
+  const deleteChatById = async (chatId: string) => {
     const chat = chats.find(c => c.id === chatId)
     if (!chat) return
 
@@ -309,10 +937,11 @@ function App() {
 
     setRecentlyDeletedChat(chat)
 
-    deleteTimeoutRef.current = window.setTimeout(() => {
+    deleteTimeoutRef.current = window.setTimeout(async () => {
       setChats(prev => prev.filter(c => c.id !== chat.id))
       setRecentlyDeletedChat(null)
       deleteTimeoutRef.current = null
+      await AppStorage.deleteChat(chatId) // Delete from DB
     }, 4000)
   }
 
@@ -326,10 +955,11 @@ function App() {
       await handleExplainClipboard()
     }
 
-    window.ipcRenderer.on('trigger-explain-clipboard', handleHotKey)
+    const { ipcRenderer } = window.require('electron')
+    ipcRenderer.on('trigger-explain-clipboard', handleHotKey)
 
     return () => {
-      window.ipcRenderer.off('trigger-explain-clipboard', handleHotKey)
+      ipcRenderer.removeAllListeners('trigger-explain-clipboard')
     }
   }, [])
 
@@ -362,7 +992,7 @@ function App() {
       const sel = window.getSelection()
 
       range.selectNodeContents(el)
-      range.collapse(false) // move caret to END
+      range.collapse(false)
       sel?.removeAllRanges()
       sel?.addRange(range)
     })
@@ -370,24 +1000,48 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+F / Cmd+F to open message search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f' && activeChatId && rightPanel === 'panel-chat') {
+        e.preventDefault()
+        setMessageSearchExpanded(true)
+        setTimeout(() => messageSearchInputRef.current?.focus(), 100)
+        return
+      }
+
+      // Enter / Shift+Enter to navigate search results
+      if (messageSearchExpanded && messageSearchQuery && document.activeElement === messageSearchInputRef.current) {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          navigateToMatch(e.shiftKey ? 'prev' : 'next')
+          return
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          setMessageSearchQuery('')
+          setMessageSearchExpanded(false)
+          return
+        }
+      }
+
       if (editingShortcut) return
 
-      // Ignore if typing in an editable field
       const target = e.target as HTMLElement
       if (target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(target.tagName)) return
       if (!activeChatId) return
 
-      // Handle keyboard shortcuts for active chat
       const key = e.key.toLowerCase()
       switch (key) {
         case shortcuts.favorite:
           e.preventDefault()
           setChats(prev =>
-            prev.map(c =>
-              c.id === activeChatId
-                ? { ...c, favorite: !c.favorite }
-                : c
-            )
+            prev.map(c => {
+              if (c.id === activeChatId) {
+                const updated = { ...c, favorite: !c.favorite }
+                AppStorage.updateChat(activeChatId, { favorite: updated.favorite })
+                return updated
+              }
+              return c
+            })
           )
           break
 
@@ -402,7 +1056,7 @@ function App() {
           break
           
         case 'delete':
-        case 'backspace':     // for Mac keyboards
+        case 'backspace':
           e.preventDefault()
           deleteChatById(activeChatId)
           break
@@ -411,7 +1065,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeChatId, chats])
+  }, [activeChatId, chats, shortcuts])
 
   useEffect(() => {
     if (!editingShortcut) return
@@ -424,7 +1078,7 @@ function App() {
         return
       }
 
-      setShortcuts(prev => ({
+      setShortcuts((prev: typeof shortcuts) => ({
         ...prev,
         [editingShortcut]: e.key.toLowerCase()
       }))
@@ -454,18 +1108,17 @@ function App() {
     }
   }, [sortDropdownOpen])
 
-  const activeChat = chats.find(c => c.id === activeChatId)
-
   return (
     <div className="app">
       {/* Sidebar */}
       <div className="sidebar">
         <button
           className="new-chat"
-          onClick={() => {
+          onClick={async () => {
             const newChat = createNewChat()
             setChats(prev => [newChat, ...prev])
             setActiveChatId(newChat.id)
+            await AppStorage.saveChat(newChat)
           }}
         >
           + New Chat
@@ -554,7 +1207,7 @@ function App() {
           {getSortedChats().map(chat => (
             <div
               key={chat.id}
-              className={`chat-item ${chat.id === activeChatId ? 'active' : ''}${chat.isDeleting ? 'chat-deleting' : ''}`}
+              className={`chat-item ${chat.id === activeChatId ? 'active' : ''}${chat.isDeleting ? ' chat-deleting' : ''}`}
               onClick={() => {
                 if (renamingChatId) return
                 setActiveChatId(chat.id)
@@ -576,7 +1229,7 @@ function App() {
                       contentEditable
                       suppressContentEditableWarning
                       autoFocus
-                      onBlur={e => {
+                      onBlur={async (e) => {
                         const value = e.currentTarget.textContent?.trim()
                         if (value) {
                           setChats(prev =>
@@ -584,6 +1237,7 @@ function App() {
                               c.id === chat.id ? { ...c, title: value } : c
                             )
                           )
+                          await AppStorage.updateChat(chat.id, { title: value })
                         }
                         setRenamingChatId(null)
                       }}
@@ -610,14 +1264,17 @@ function App() {
                   className={`chat-fav-icon ${
                     chat.favorite ? 'is-favorite fav-pop' : 'fav-burst'
                   }`}
-                  onClick={e => {
+                  onClick={async (e) => {
                     e.stopPropagation()
                     setChats(prev =>
-                      prev.map(c =>
-                        c.id === chat.id
-                          ? { ...c, favorite: !c.favorite }
-                          : c
-                      )
+                      prev.map(c => {
+                        if (c.id === chat.id) {
+                          const updated = { ...c, favorite: !c.favorite }
+                          AppStorage.updateChat(chat.id, { favorite: updated.favorite })
+                          return updated
+                        }
+                        return c
+                      })
                     )
                   }}
                 />
@@ -627,6 +1284,13 @@ function App() {
         </div>
 
         <div className="sidebar-footer">
+          <button
+            className="sidebar-icon-button"
+            title="Analytics"
+            onClick={() => setRightPanel(prev => prev === 'panel-analytics' ? 'panel-chat' : 'panel-analytics')}
+          >
+            <BarChart3 size={18} />
+          </button>
           <button
             className="sidebar-icon-button"
             title="Keyboard shortcuts"
@@ -642,55 +1306,224 @@ function App() {
         <div className="right-panel-inner">
           {rightPanel === 'panel-chat' && (
             <div className="chat">
+              {/* Search bar */}
+              {activeChat && (
+                <div 
+                  className={`message-search-container ${messageSearchExpanded ? 'expanded' : ''}`}
+                  onMouseEnter={() => setMessageSearchExpanded(true)}
+                  onMouseLeave={() => {
+                    if (!messageSearchQuery) setMessageSearchExpanded(false)
+                  }}
+                >
+                  <div className="message-search-bar">
+                    <Search size={16} className="search-icon" />
+                    <input
+                      ref={messageSearchInputRef}
+                      type="text"
+                      className="message-search-input"
+                      placeholder="Search messages..."
+                      value={messageSearchQuery}
+                      onChange={(e) => setMessageSearchQuery(e.target.value)}
+                      onFocus={() => setMessageSearchExpanded(true)}
+                    />
+                    {messageSearchQuery && (
+                      <>
+                        <span className="search-count">
+                          {totalMatches > 0 ? `${currentMatchIndex + 1}/${totalMatches}` : 'No matches'}
+                        </span>
+                        <button
+                          className="search-nav-btn"
+                          onClick={() => navigateToMatch('prev')}
+                          disabled={totalMatches === 0}
+                          title="Previous match"
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button
+                          className="search-nav-btn"
+                          onClick={() => navigateToMatch('next')}
+                          disabled={totalMatches === 0}
+                          title="Next match"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                        <button
+                          className="search-clear-btn"
+                          onClick={() => {
+                            setMessageSearchQuery('')
+                            setMessageSearchExpanded(false)
+                          }}
+                          title="Clear search"
+                        >
+                          <X size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               <div className="chat-inner">
                 {activeChat ? (
                   <>
-                    {activeChat.messages.map((msg, index) => (
-                      <div key={msg.id}>
-                        <div className={`msg-row ${msg.role}`}>
-                          <div className="msg-bubble">
-                            {msg.role === 'assistant' && <div className="msg-label">AI</div>}
-                            {msg.role === 'user' && <div className="msg-label">You</div>}
-                            <div className="msg-content">{msg.content}</div>
+                    {activeChat.messages.map((msg, index) => {
+                      const matchIndex = matchedMessages.findIndex(m => m.index === index)
+                      const isMatched = matchIndex !== -1
+                      const isCurrentMatch = isMatched && matchIndex === currentMatchIndex
+                      
+                      return (
+                        <div 
+                          key={msg.id}
+                          ref={(el) => {
+                            if (isMatched && el) {
+                              matchedMessageRefs.current[matchIndex] = el
+                            }
+                          }}
+                        >
+                          <div className={`msg-row ${msg.role}`}>
+                            <div className="msg-bubble">
+                              {msg.role === 'assistant' && <div className="msg-label">AI</div>}
+                              {msg.role === 'user' && <div className="msg-label">You</div>}
+                              
+                              {editingMessageId === msg.id ? (
+                                <div className="msg-edit-container">
+                                  <textarea
+                                    className="msg-edit-input"
+                                    value={editingMessageContent}
+                                    onChange={(e) => setEditingMessageContent(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault()
+                                        handleSaveEdit(msg.id, index)
+                                      }
+                                      if (e.key === 'Escape') {
+                                        handleCancelEdit()
+                                      }
+                                    }}
+                                    autoFocus
+                                    disabled={isTyping}
+                                  />
+                                  <div className="msg-edit-actions">
+                                    <button
+                                      className="msg-edit-save"
+                                      onClick={() => handleSaveEdit(msg.id, index)}
+                                      disabled={!editingMessageContent.trim() || isTyping}
+                                      title="Save and regenerate (Enter)"
+                                    >
+                                      <Check size={14} />
+                                      Save
+                                    </button>
+                                    <button
+                                      className="msg-edit-cancel"
+                                      onClick={handleCancelEdit}
+                                      disabled={isTyping}
+                                      title="Cancel (Esc)"
+                                    >
+                                      <X size={14} />
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="msg-content">
+                                  {highlightMatches(msg.content, isCurrentMatch)}
+                                </div>
+                              )}
+                            </div>
                           </div>
+                          
+                          {/* Action buttons for user messages */}
+                          {msg.role === 'user' && editingMessageId !== msg.id && (
+                            <div className="msg-actions">
+                              <button
+                                className="msg-action-btn"
+                                onClick={() => handleCopyMessage(msg.content)}
+                                title="Copy"
+                              >
+                                <Copy size={14} />
+                              </button>
+                              <button
+                                className="msg-action-btn"
+                                onClick={() => handleEditMessage(msg.id, msg.content)}
+                                title="Edit message"
+                                disabled={isTyping}
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                            </div>
+                          )}
+                          
+                          {/* Action buttons for AI messages */}
+                          {msg.role === 'assistant' && (
+                            <div className="msg-actions">
+                              {/* Branch navigation */}
+                              {getBranchInfo(index) && (
+                                <>
+                                  <button
+                                    className="msg-action-btn"
+                                    onClick={() => handleSwitchBranch(index, 'prev')}
+                                    title="Previous branch"
+                                    disabled={isTyping}
+                                  >
+                                    <ChevronLeft size={14} />
+                                  </button>
+                                  <span className="branch-indicator">
+                                    {getBranchInfo(index)!.current}/{getBranchInfo(index)!.total}
+                                  </span>
+                                  <button
+                                    className="msg-action-btn"
+                                    onClick={() => handleSwitchBranch(index, 'next')}
+                                    title="Next branch"
+                                    disabled={isTyping}
+                                  >
+                                    <ChevronRight size={14} />
+                                  </button>
+                                  <div className="action-divider"></div>
+                                </>
+                              )}
+                              
+                              <button
+                                className="msg-action-btn"
+                                onClick={() => handleCreateBranch(index)}
+                                title="Create alternate path from here"
+                                disabled={isTyping}
+                              >
+                                <GitBranch size={14} />
+                              </button>
+                              <button
+                                className="msg-action-btn"
+                                onClick={() => handleCopyMessage(msg.content)}
+                                title="Copy"
+                              >
+                                <Copy size={14} />
+                              </button>
+                              <button
+                                className={`msg-action-btn ${messageReactions[msg.id] === 'like' ? 'active-like' : ''}`}
+                                onClick={() => handleLikeMessage(msg.id)}
+                                title="Like"
+                              >
+                                <ThumbsUp size={14} />
+                              </button>
+                              <button
+                                className={`msg-action-btn ${messageReactions[msg.id] === 'dislike' ? 'active-dislike' : ''}`}
+                                onClick={() => handleDislikeMessage(msg.id)}
+                                title="Dislike"
+                              >
+                                <ThumbsDown size={14} />
+                              </button>
+                              <button
+                                className="msg-action-btn"
+                                onClick={() => handleRetryMessage(index)}
+                                title="Retry"
+                                disabled={isTyping}
+                              >
+                                <RotateCcw size={14} />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        
-                        {/* Action buttons for AI messages */}
-                        {msg.role === 'assistant' && (
-                          <div className="msg-actions">
-                            <button
-                              className="msg-action-btn"
-                              onClick={() => handleCopyMessage(msg.content)}
-                              title="Copy"
-                            >
-                              <Copy size={14} />
-                            </button>
-                            <button
-                              className={`msg-action-btn ${messageReactions[msg.id] === 'like' ? 'active-like' : ''}`}
-                              onClick={() => handleLikeMessage(msg.id)}
-                              title="Like"
-                            >
-                              <ThumbsUp size={14} />
-                            </button>
-                            <button
-                              className={`msg-action-btn ${messageReactions[msg.id] === 'dislike' ? 'active-dislike' : ''}`}
-                              onClick={() => handleDislikeMessage(msg.id)}
-                              title="Dislike"
-                            >
-                              <ThumbsDown size={14} />
-                            </button>
-                            <button
-                              className="msg-action-btn"
-                              onClick={() => handleRetryMessage(index)}
-                              title="Retry"
-                              disabled={isTyping}
-                            >
-                              <RotateCcw size={14} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      )
+                    })}
                     {userIsTyping && (
                       <div className="typing-indicator user-typing">
                         <div className="typing-bubble user-typing-bubble">
@@ -725,65 +1558,240 @@ function App() {
               </div>
 
               <div className="shortcuts-list">
-                <div className="shortcut-item">
-                  <div className="shortcut-info">
-                    <div className="shortcut-name">Favorite Chat</div>
-                    <div className="shortcut-description">Mark the active chat as favorite</div>
+                {/* Chat Section */}
+                <div className="shortcuts-section">
+                  <h3 className="shortcuts-section-title">Chat</h3>
+                  
+                  <div className="shortcut-item">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Favorite Chat</div>
+                      <div className="shortcut-description">Mark the active chat as favorite</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div
+                        className={`shortcut-key ${editingShortcut === 'favorite' ? 'editing' : ''}`}
+                        onClick={() => setEditingShortcut('favorite')}
+                      >
+                        {editingShortcut === 'favorite' ? 'Press key' : shortcuts.favorite}
+                      </div>
+                    </div>
                   </div>
-                  <div className="shortcut-key-wrapper">
-                    <div
-                      className={`shortcut-key ${editingShortcut === 'favorite' ? 'editing' : ''}`}
-                      onClick={() => setEditingShortcut('favorite')}
-                    >
-                      {editingShortcut === 'favorite' ? 'Press key' : shortcuts.favorite}
+
+                  <div className="shortcut-item">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Rename Chat</div>
+                      <div className="shortcut-description">Rename the active chat</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div
+                        className={`shortcut-key ${editingShortcut === 'rename' ? 'editing' : ''}`}
+                        onClick={() => setEditingShortcut('rename')}
+                      >
+                        {editingShortcut === 'rename' ? 'Press key' : shortcuts.rename}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="shortcut-item">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Delete Chat</div>
+                      <div className="shortcut-description">Delete the active chat</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div
+                        className={`shortcut-key ${editingShortcut === 'delete' ? 'editing' : ''}`}
+                        onClick={() => setEditingShortcut('delete')}
+                      >
+                        {editingShortcut === 'delete' ? 'Press key' : shortcuts.delete}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="shortcut-item">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Deselect Chat</div>
+                      <div className="shortcut-description">Clear the active chat selection</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div
+                        className={`shortcut-key ${editingShortcut === 'deselect' ? 'editing' : ''}`}
+                        onClick={() => setEditingShortcut('deselect')}
+                      >
+                        {editingShortcut === 'deselect' ? 'Press key' : shortcuts.deselect}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="shortcut-item">
-                  <div className="shortcut-info">
-                    <div className="shortcut-name">Rename Chat</div>
-                    <div className="shortcut-description">Rename the active chat</div>
-                  </div>
-                  <div className="shortcut-key-wrapper">
-                    <div
-                      className={`shortcut-key ${editingShortcut === 'rename' ? 'editing' : ''}`}
-                      onClick={() => setEditingShortcut('rename')}
-                    >
-                      {editingShortcut === 'rename' ? 'Press key' : shortcuts.rename}
+                {/* Messages Section */}
+                <div className="shortcuts-section">
+                  <h3 className="shortcuts-section-title">Messages</h3>
+                  
+                  <div className="shortcut-item non-editable">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Search Messages</div>
+                      <div className="shortcut-description">Open message search in active chat</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div className="shortcut-key fixed">
+                        {navigator.platform.includes('Mac') ? '⌘+F' : 'Ctrl+F'}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="shortcut-item">
-                  <div className="shortcut-info">
-                    <div className="shortcut-name">Delete Chat</div>
-                    <div className="shortcut-description">Delete the active chat</div>
-                  </div>
-                  <div className="shortcut-key-wrapper">
-                    <div
-                      className={`shortcut-key ${editingShortcut === 'delete' ? 'editing' : ''}`}
-                      onClick={() => setEditingShortcut('delete')}
-                    >
-                      {editingShortcut === 'delete' ? 'Press key' : shortcuts.delete}
+                  <div className="shortcut-item non-editable">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Navigate Search Results</div>
+                      <div className="shortcut-description">Move between search matches</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div className="shortcut-key fixed">Enter</div>
+                      <span className="shortcut-divider">/</span>
+                      <div className="shortcut-key fixed">Shift+Enter</div>
                     </div>
                   </div>
-                </div>
 
-                <div className="shortcut-item">
-                  <div className="shortcut-info">
-                    <div className="shortcut-name">Deselect Chat</div>
-                    <div className="shortcut-description">Clear the active chat selection</div>
+                  <div className="shortcut-item non-editable">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Close Search</div>
+                      <div className="shortcut-description">Exit message search</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div className="shortcut-key fixed">Escape</div>
+                    </div>
                   </div>
-                  <div className="shortcut-key-wrapper">
-                    <div
-                      className={`shortcut-key ${editingShortcut === 'deselect' ? 'editing' : ''}`}
-                      onClick={() => setEditingShortcut('deselect')}
-                    >
-                      {editingShortcut === 'deselect' ? 'Press key' : shortcuts.deselect}
+
+                  <div className="shortcut-item non-editable">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Save Message Edit</div>
+                      <div className="shortcut-description">Save edited message and regenerate</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div className="shortcut-key fixed">Enter</div>
+                    </div>
+                  </div>
+
+                  <div className="shortcut-item non-editable">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Cancel Message Edit</div>
+                      <div className="shortcut-description">Discard message changes</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div className="shortcut-key fixed">Escape</div>
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {rightPanel === 'panel-analytics' && (
+            <div className="analytics-panel">
+              <div className="analytics-header">
+                <h2>Analytics</h2>
+                <p>Statistics about your chats and messages</p>
+              </div>
+
+              <div className="analytics-content">
+                {(() => {
+                  const analytics = getAnalytics()
+                  
+                  return (
+                    <>
+                      {/* Overall Stats */}
+                      <div className="analytics-section">
+                        <h3 className="analytics-section-title">Overall Statistics</h3>
+                        <div className="stats-grid">
+                          <div className="stat-card">
+                            <div className="stat-value">{analytics.overall.totalChats}</div>
+                            <div className="stat-label">Total Chats</div>
+                          </div>
+                          <div className="stat-card">
+                            <div className="stat-value">{analytics.overall.totalMessages}</div>
+                            <div className="stat-label">Total Messages</div>
+                          </div>
+                          <div className="stat-card">
+                            <div className="stat-value">{analytics.overall.userMessages}</div>
+                            <div className="stat-label">Your Messages</div>
+                          </div>
+                          <div className="stat-card">
+                            <div className="stat-value">{analytics.overall.aiMessages}</div>
+                            <div className="stat-label">AI Responses</div>
+                          </div>
+                          <div className="stat-card">
+                            <div className="stat-value">{analytics.overall.favoriteChats}</div>
+                            <div className="stat-label">Favorite Chats</div>
+                          </div>
+                          <div className="stat-card">
+                            <div className="stat-value">{analytics.overall.estimatedTokens.toLocaleString()}</div>
+                            <div className="stat-label">Est. Tokens Used</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Current Chat Stats */}
+                      {analytics.currentChat && (
+                        <div className="analytics-section">
+                          <h3 className="analytics-section-title">Current Chat</h3>
+                          <div className="stats-grid">
+                            <div className="stat-card">
+                              <div className="stat-value">{analytics.currentChat.messages}</div>
+                              <div className="stat-label">Messages</div>
+                            </div>
+                            <div className="stat-card">
+                              <div className="stat-value">{analytics.currentChat.words.toLocaleString()}</div>
+                              <div className="stat-label">Words</div>
+                            </div>
+                            <div className="stat-card">
+                              <div className="stat-value">{analytics.currentChat.characters.toLocaleString()}</div>
+                              <div className="stat-label">Characters</div>
+                            </div>
+                            <div className="stat-card">
+                              <div className="stat-value">{analytics.currentChat.estimatedTokens.toLocaleString()}</div>
+                              <div className="stat-label">Est. Tokens</div>
+                            </div>
+                            <div className="stat-card">
+                              <div className="stat-value">{analytics.currentChat.userMessages}</div>
+                              <div className="stat-label">Your Messages</div>
+                            </div>
+                            <div className="stat-card">
+                              <div className="stat-value">{analytics.currentChat.aiMessages}</div>
+                              <div className="stat-label">AI Responses</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Activity */}
+                      <div className="analytics-section">
+                        <h3 className="analytics-section-title">Recent Activity (Last 7 Days)</h3>
+                        <div className="activity-chart">
+                          {analytics.activity.length > 0 ? (
+                            analytics.activity.map(([date, count]) => {
+                              const maxCount = Math.max(...analytics.activity.map(([_, c]) => c))
+                              const percentage = (count / maxCount) * 100
+                              
+                              return (
+                                <div key={date} className="activity-bar-container">
+                                  <div className="activity-date">{date}</div>
+                                  <div className="activity-bar-wrapper">
+                                    <div 
+                                      className="activity-bar" 
+                                      style={{ width: `${percentage}%` }}
+                                    ></div>
+                                  </div>
+                                  <div className="activity-count">{count}</div>
+                                </div>
+                              )
+                            })
+                          ) : (
+                            <div className="no-activity">No messages yet</div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             </div>
           )}
@@ -849,13 +1857,16 @@ function App() {
           <div className='context-item'>
             <div
               className="context-left"
-              onClick={() => {
+              onClick={async () => {
                 setChats(prev =>
-                  prev.map(c =>
-                    c.id === chatContextMenu.chatId
-                      ? { ...c, favorite: !c.favorite }
-                      : c
-                  )
+                  prev.map(c => {
+                    if (c.id === chatContextMenu.chatId) {
+                      const updated = { ...c, favorite: !c.favorite }
+                      AppStorage.updateChat(chatContextMenu.chatId, { favorite: updated.favorite })
+                      return updated
+                    }
+                    return c
+                  })
                 )
                 setChatContextMenu(null)
               }}
