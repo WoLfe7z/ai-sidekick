@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, ChevronDown } from 'lucide-react' 
+import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, ChevronDown, Edit2, Check } from 'lucide-react' 
 import './styles/base.css'
 import './styles/sidebar.css'
 import './styles/chat.css'
@@ -172,6 +172,10 @@ function App() {
     [messageId: string]: 'like' | 'dislike' | null
   }>({})
 
+  // Message editing state
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [editingMessageContent, setEditingMessageContent] = useState('')
+
   const handleCopyMessage = (content: string) => {
     navigator.clipboard.writeText(content)
   }
@@ -288,6 +292,81 @@ function App() {
     }
     
     // Save final complete message
+    const finalMessage = { ...assistantMessage, content: reply }
+    await AppStorage.saveMessage(activeChatId, finalMessage)
+  }
+
+  const handleEditMessage = (messageId: string, currentContent: string) => {
+    setEditingMessageId(messageId)
+    setEditingMessageContent(currentContent)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null)
+    setEditingMessageContent('')
+  }
+
+  const handleSaveEdit = async (messageId: string, messageIndex: number) => {
+    if (!activeChatId || !editingMessageContent.trim()) return
+
+    const newContent = editingMessageContent.trim()
+    
+    // Update the user message
+    setChats(prev =>
+      prev.map(c => {
+        if (c.id !== activeChatId) return c
+        const updatedMessages = c.messages.slice(0, messageIndex + 1).map(msg =>
+          msg.id === messageId ? { ...msg, content: newContent } : msg
+        )
+        const updated = { ...c, messages: updatedMessages }
+        AppStorage.saveChat(updated)
+        return updated
+      })
+    )
+
+    // Clear editing state
+    setEditingMessageId(null)
+    setEditingMessageContent('')
+
+    // Regenerate AI response
+    setIsTyping(true)
+    const reply = await window.ai.explainText(newContent)
+    setIsTyping(false)
+
+    // Create assistant message
+    const assistantMessageId = crypto.randomUUID()
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now()
+    }
+
+    setChats(prev => addMessageToChat(prev, activeChatId, assistantMessage))
+
+    // Stream the response
+    const chars = reply.split('')
+    for (let i = 0; i < chars.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+      
+      setChats(prev => 
+        prev.map(chat => {
+          if (chat.id !== activeChatId) return chat
+          return {
+            ...chat,
+            messages: chat.messages.map(msg => {
+              if (msg.id !== assistantMessageId) return msg
+              return {
+                ...msg,
+                content: reply.substring(0, i + 1)
+              }
+            })
+          }
+        })
+      )
+    }
+
+    // Save final message
     const finalMessage = { ...assistantMessage, content: reply }
     await AppStorage.saveMessage(activeChatId, finalMessage)
   }
@@ -1031,11 +1110,67 @@ function App() {
                             <div className="msg-bubble">
                               {msg.role === 'assistant' && <div className="msg-label">AI</div>}
                               {msg.role === 'user' && <div className="msg-label">You</div>}
-                              <div className="msg-content">
-                                {highlightMatches(msg.content, isCurrentMatch)}
-                              </div>
+                              
+                              {editingMessageId === msg.id ? (
+                                <div className="msg-edit-container">
+                                  <textarea
+                                    className="msg-edit-input"
+                                    value={editingMessageContent}
+                                    onChange={(e) => setEditingMessageContent(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault()
+                                        handleSaveEdit(msg.id, index)
+                                      }
+                                      if (e.key === 'Escape') {
+                                        handleCancelEdit()
+                                      }
+                                    }}
+                                    autoFocus
+                                    disabled={isTyping}
+                                  />
+                                  <div className="msg-edit-actions">
+                                    <button
+                                      className="msg-edit-save"
+                                      onClick={() => handleSaveEdit(msg.id, index)}
+                                      disabled={!editingMessageContent.trim() || isTyping}
+                                      title="Save and regenerate (Enter)"
+                                    >
+                                      <Check size={14} />
+                                      Save
+                                    </button>
+                                    <button
+                                      className="msg-edit-cancel"
+                                      onClick={handleCancelEdit}
+                                      disabled={isTyping}
+                                      title="Cancel (Esc)"
+                                    >
+                                      <X size={14} />
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="msg-content">
+                                  {highlightMatches(msg.content, isCurrentMatch)}
+                                </div>
+                              )}
                             </div>
                           </div>
+                          
+                          {/* Action buttons for user messages */}
+                          {msg.role === 'user' && editingMessageId !== msg.id && (
+                            <div className="msg-actions">
+                              <button
+                                className="msg-action-btn"
+                                onClick={() => handleEditMessage(msg.id, msg.content)}
+                                title="Edit message"
+                                disabled={isTyping}
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                            </div>
+                          )}
                           
                           {/* Action buttons for AI messages */}
                           {msg.role === 'assistant' && (

@@ -205,3 +205,107 @@
     opacity: 1;
   }
 }
+
+/* ============================================
+   MESSAGE EDITING
+   ============================================ */
+
+.msg-edit-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.msg-edit-input {
+  width: 100%;
+  min-height: 80px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  color: #e5e7eb;
+  font-size: 0.95rem;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.msg-edit-input:focus {
+  border-color: #1e40af;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.msg-edit-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.msg-edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.msg-edit-save,
+.msg-edit-cancel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.msg-edit-save {
+  background: #1e40af;
+  color: #e0e7ff;
+  border: 1px solid #2563eb;
+}
+
+.msg-edit-save:hover:not(:disabled) {
+  background: #1e3a8a;
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.msg-edit-save:disabled {
+  background: #1f2937;
+  color: #4b5563;
+  border-color: #374151;
+  cursor: not-allowed;
+}
+
+.msg-edit-cancel {
+  background: transparent;
+  color: #9ca3af;
+  border: 1px solid #374151;
+}
+
+.msg-edit-cancel:hover:not(:disabled) {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-color: #4b5563;
+}
+
+.msg-edit-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Make user message bubbles wider when editing */
+.msg-row.user .msg-bubble:has(.msg-edit-container) {
+  max-width: 80%;
+}
+
+/* Align user message actions to the right */
+.msg-row.user + .msg-actions {
+  justify-content: flex-end;
+  margin-right: 8px;
+}
