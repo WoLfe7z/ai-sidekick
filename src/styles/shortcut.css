@@ -28,8 +28,23 @@
 .shortcuts-list {
   display: flex;
   flex-direction: column;
+  gap: 32px;
+  max-width: 700px;
+}
+
+.shortcuts-section {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  max-width: 600px;
+}
+
+.shortcuts-section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e5e7eb;
+  margin: 0 0 8px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a2a2a;
 }
 
 .shortcut-item {
@@ -46,6 +61,16 @@
 .shortcut-item:hover {
   background: #222;
   border-color: #333;
+}
+
+.shortcut-item.non-editable {
+  opacity: 0.9;
+}
+
+.shortcut-item.non-editable:hover {
+  background: #1a1a1a;
+  border-color: #2a2a2a;
+  cursor: default;
 }
 
 .shortcut-info {
@@ -68,7 +93,12 @@
 .shortcut-key-wrapper {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+}
+
+.shortcut-divider {
+  color: #6b7280;
+  font-size: 0.9rem;
 }
 
 .shortcut-key {
@@ -89,6 +119,16 @@
 .shortcut-key:hover {
   background: #111;
   border-color: #444;
+}
+
+.shortcut-key.fixed {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.shortcut-key.fixed:hover {
+  background: #0a0a0a;
+  border-color: #333;
 }
 
 .shortcut-key.editing {

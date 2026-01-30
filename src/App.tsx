@@ -1496,62 +1496,126 @@ function App() {
               </div>
 
               <div className="shortcuts-list">
-                <div className="shortcut-item">
-                  <div className="shortcut-info">
-                    <div className="shortcut-name">Favorite Chat</div>
-                    <div className="shortcut-description">Mark the active chat as favorite</div>
+                {/* Chat Section */}
+                <div className="shortcuts-section">
+                  <h3 className="shortcuts-section-title">Chat</h3>
+                  
+                  <div className="shortcut-item">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Favorite Chat</div>
+                      <div className="shortcut-description">Mark the active chat as favorite</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div
+                        className={`shortcut-key ${editingShortcut === 'favorite' ? 'editing' : ''}`}
+                        onClick={() => setEditingShortcut('favorite')}
+                      >
+                        {editingShortcut === 'favorite' ? 'Press key' : shortcuts.favorite}
+                      </div>
+                    </div>
                   </div>
-                  <div className="shortcut-key-wrapper">
-                    <div
-                      className={`shortcut-key ${editingShortcut === 'favorite' ? 'editing' : ''}`}
-                      onClick={() => setEditingShortcut('favorite')}
-                    >
-                      {editingShortcut === 'favorite' ? 'Press key' : shortcuts.favorite}
+
+                  <div className="shortcut-item">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Rename Chat</div>
+                      <div className="shortcut-description">Rename the active chat</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div
+                        className={`shortcut-key ${editingShortcut === 'rename' ? 'editing' : ''}`}
+                        onClick={() => setEditingShortcut('rename')}
+                      >
+                        {editingShortcut === 'rename' ? 'Press key' : shortcuts.rename}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="shortcut-item">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Delete Chat</div>
+                      <div className="shortcut-description">Delete the active chat</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div
+                        className={`shortcut-key ${editingShortcut === 'delete' ? 'editing' : ''}`}
+                        onClick={() => setEditingShortcut('delete')}
+                      >
+                        {editingShortcut === 'delete' ? 'Press key' : shortcuts.delete}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="shortcut-item">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Deselect Chat</div>
+                      <div className="shortcut-description">Clear the active chat selection</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div
+                        className={`shortcut-key ${editingShortcut === 'deselect' ? 'editing' : ''}`}
+                        onClick={() => setEditingShortcut('deselect')}
+                      >
+                        {editingShortcut === 'deselect' ? 'Press key' : shortcuts.deselect}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="shortcut-item">
-                  <div className="shortcut-info">
-                    <div className="shortcut-name">Rename Chat</div>
-                    <div className="shortcut-description">Rename the active chat</div>
-                  </div>
-                  <div className="shortcut-key-wrapper">
-                    <div
-                      className={`shortcut-key ${editingShortcut === 'rename' ? 'editing' : ''}`}
-                      onClick={() => setEditingShortcut('rename')}
-                    >
-                      {editingShortcut === 'rename' ? 'Press key' : shortcuts.rename}
+                {/* Messages Section */}
+                <div className="shortcuts-section">
+                  <h3 className="shortcuts-section-title">Messages</h3>
+                  
+                  <div className="shortcut-item non-editable">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Search Messages</div>
+                      <div className="shortcut-description">Open message search in active chat</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div className="shortcut-key fixed">
+                        {navigator.platform.includes('Mac') ? '⌘+F' : 'Ctrl+F'}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="shortcut-item">
-                  <div className="shortcut-info">
-                    <div className="shortcut-name">Delete Chat</div>
-                    <div className="shortcut-description">Delete the active chat</div>
-                  </div>
-                  <div className="shortcut-key-wrapper">
-                    <div
-                      className={`shortcut-key ${editingShortcut === 'delete' ? 'editing' : ''}`}
-                      onClick={() => setEditingShortcut('delete')}
-                    >
-                      {editingShortcut === 'delete' ? 'Press key' : shortcuts.delete}
+                  <div className="shortcut-item non-editable">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Navigate Search Results</div>
+                      <div className="shortcut-description">Move between search matches</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div className="shortcut-key fixed">Enter</div>
+                      <span className="shortcut-divider">/</span>
+                      <div className="shortcut-key fixed">Shift+Enter</div>
                     </div>
                   </div>
-                </div>
 
-                <div className="shortcut-item">
-                  <div className="shortcut-info">
-                    <div className="shortcut-name">Deselect Chat</div>
-                    <div className="shortcut-description">Clear the active chat selection</div>
+                  <div className="shortcut-item non-editable">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Close Search</div>
+                      <div className="shortcut-description">Exit message search</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div className="shortcut-key fixed">Escape</div>
+                    </div>
                   </div>
-                  <div className="shortcut-key-wrapper">
-                    <div
-                      className={`shortcut-key ${editingShortcut === 'deselect' ? 'editing' : ''}`}
-                      onClick={() => setEditingShortcut('deselect')}
-                    >
-                      {editingShortcut === 'deselect' ? 'Press key' : shortcuts.deselect}
+
+                  <div className="shortcut-item non-editable">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Save Message Edit</div>
+                      <div className="shortcut-description">Save edited message and regenerate</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div className="shortcut-key fixed">Enter</div>
+                    </div>
+                  </div>
+
+                  <div className="shortcut-item non-editable">
+                    <div className="shortcut-info">
+                      <div className="shortcut-name">Cancel Message Edit</div>
+                      <div className="shortcut-description">Discard message changes</div>
+                    </div>
+                    <div className="shortcut-key-wrapper">
+                      <div className="shortcut-key fixed">Escape</div>
                     </div>
                   </div>
                 </div>
