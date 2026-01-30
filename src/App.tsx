@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, ChevronDown, Edit2, Check } from 'lucide-react' 
+import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, ChevronDown, Edit2, Check, GitBranch, ChevronLeft, ChevronRight } from 'lucide-react' 
 import './styles/base.css'
 import './styles/sidebar.css'
 import './styles/chat.css'
@@ -161,6 +161,28 @@ class AppStorage {
       console.error('❌ Failed to save shortcuts:', error)
     }
   }
+
+  // Save branch data for a chat
+  static saveBranches(chatId: string, branches: any): void {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      ipcRenderer.send('store:set', `branches:${chatId}`, branches)
+    } catch (error) {
+      console.error('❌ Failed to save branches:', error)
+    }
+  }
+
+  // Load branch data for a chat
+  static loadBranches(chatId: string): any {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      const branches = ipcRenderer.sendSync('store:get', `branches:${chatId}`)
+      return branches || {}
+    } catch (error) {
+      console.error('❌ Failed to load branches:', error)
+      return {}
+    }
+  }
 }
 
 function App() {
@@ -175,6 +197,15 @@ function App() {
   // Message editing state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editingMessageContent, setEditingMessageContent] = useState('')
+
+  // Message branching state
+  // Structure: { messageIndex: { branches: Message[][], currentBranch: number } }
+  const [messageBranches, setMessageBranches] = useState<{
+    [messageIndex: number]: {
+      branches: Message[][]  // Each branch is an array of messages from that point forward
+      currentBranch: number
+    }
+  }>({})
 
   const handleCopyMessage = (content: string) => {
     navigator.clipboard.writeText(content)
@@ -371,6 +402,121 @@ function App() {
     await AppStorage.saveMessage(activeChatId, finalMessage)
   }
 
+  // Create a new branch from a message
+  const handleCreateBranch = async (messageIndex: number) => {
+    if (!activeChatId || isTyping) return
+    
+    const chat = chats.find(c => c.id === activeChatId)
+    if (!chat) return
+
+    // Get messages up to and including the branch point
+    const baseMessages = chat.messages.slice(0, messageIndex + 1)
+    const remainingMessages = chat.messages.slice(messageIndex + 1)
+
+    // Initialize branch structure if it doesn't exist
+    if (!messageBranches[messageIndex]) {
+      setMessageBranches(prev => ({
+        ...prev,
+        [messageIndex]: {
+          branches: [remainingMessages], // Original path as first branch
+          currentBranch: 0
+        }
+      }))
+    }
+
+    // Add new empty branch
+    setMessageBranches(prev => ({
+      ...prev,
+      [messageIndex]: {
+        branches: [...(prev[messageIndex]?.branches || [remainingMessages]), []],
+        currentBranch: (prev[messageIndex]?.branches.length || 1)
+      }
+    }))
+
+    // Update chat to show only base messages
+    setChats(prev =>
+      prev.map(c => {
+        if (c.id !== activeChatId) return c
+        return {
+          ...c,
+          messages: baseMessages
+        }
+      })
+    )
+  }
+
+  // Navigate between branches
+  const handleSwitchBranch = (messageIndex: number, direction: 'prev' | 'next') => {
+    if (!activeChatId) return
+
+    const chat = chats.find(c => c.id === activeChatId)
+    if (!chat) return
+
+    const branchData = messageBranches[messageIndex]
+    if (!branchData) return
+
+    // Before switching, save the current branch's messages
+    const baseMessages = chat.messages.slice(0, messageIndex + 1)
+    const currentBranchMessages = chat.messages.slice(messageIndex + 1)
+    
+    setMessageBranches(prev => ({
+      ...prev,
+      [messageIndex]: {
+        ...prev[messageIndex],
+        branches: prev[messageIndex].branches.map((branch, i) => 
+          i === prev[messageIndex].currentBranch ? currentBranchMessages : branch
+        )
+      }
+    }))
+
+    const totalBranches = branchData.branches.length
+    let newBranchIndex = branchData.currentBranch
+
+    if (direction === 'next') {
+      newBranchIndex = (branchData.currentBranch + 1) % totalBranches
+    } else {
+      newBranchIndex = (branchData.currentBranch - 1 + totalBranches) % totalBranches
+    }
+
+    // Update current branch index
+    const updatedBranchData = {
+      ...branchData,
+      currentBranch: newBranchIndex,
+      branches: branchData.branches.map((branch, i) => 
+        i === branchData.currentBranch ? currentBranchMessages : branch
+      )
+    }
+
+    setMessageBranches(prev => ({
+      ...prev,
+      [messageIndex]: updatedBranchData
+    }))
+
+    // Update chat messages to show the selected branch
+    const branchMessages = updatedBranchData.branches[newBranchIndex]
+
+    setChats(prev =>
+      prev.map(c => {
+        if (c.id !== activeChatId) return c
+        return {
+          ...c,
+          messages: [...baseMessages, ...branchMessages]
+        }
+      })
+    )
+  }
+
+  // Get branch info for a message
+  const getBranchInfo = (messageIndex: number) => {
+    const branchData = messageBranches[messageIndex]
+    if (!branchData || branchData.branches.length <= 1) return null
+
+    return {
+      current: branchData.currentBranch + 1,
+      total: branchData.branches.length
+    }
+  }
+
   // Chat state
   const [chats, setChats] = useState<Chat[]>([])
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
@@ -499,12 +645,41 @@ function App() {
     const loadChatData = async () => {
       if (!activeChatId) {
         setMessageReactions({})
+        setMessageBranches({})
         return
       }
 
       const chat = await AppStorage.loadChat(activeChatId)
       if (chat) {
-        setChats(prev => prev.map(c => c.id === activeChatId ? chat : c))
+        // Load branches first
+        const branches = AppStorage.loadBranches(activeChatId)
+        setMessageBranches(branches)
+
+        // If branches exist, reconstruct messages to show the current branch
+        if (Object.keys(branches).length > 0) {
+          // Find the earliest branch point
+          const branchIndices = Object.keys(branches).map(k => parseInt(k)).sort((a, b) => a - b)
+          const earliestBranch = branchIndices[0]
+          const branchData = branches[earliestBranch]
+          
+          if (branchData && branchData.branches && branchData.branches.length > 0) {
+            // Get base messages up to branch point
+            const baseMessages = chat.messages.slice(0, earliestBranch + 1)
+            // Get current branch messages
+            const currentBranchMessages = branchData.branches[branchData.currentBranch] || []
+            
+            // Update chat with reconstructed messages
+            const reconstructedChat = {
+              ...chat,
+              messages: [...baseMessages, ...currentBranchMessages]
+            }
+            setChats(prev => prev.map(c => c.id === activeChatId ? reconstructedChat : c))
+          } else {
+            setChats(prev => prev.map(c => c.id === activeChatId ? chat : c))
+          }
+        } else {
+          setChats(prev => prev.map(c => c.id === activeChatId ? chat : c))
+        }
       }
 
       const reactions = await AppStorage.loadReactions(activeChatId)
@@ -517,6 +692,13 @@ function App() {
   useEffect(() => {
     AppStorage.saveShortcuts(shortcuts)
   }, [shortcuts])
+
+  // Save branches when they change
+  useEffect(() => {
+    if (activeChatId && Object.keys(messageBranches).length > 0) {
+      AppStorage.saveBranches(activeChatId, messageBranches)
+    }
+  }, [messageBranches, activeChatId])
 
   // Function to read from clipboard and set input
   const addSystemMessage = (text: string) => {
@@ -632,6 +814,36 @@ function App() {
     // Save final complete message
     const finalMessage = { ...assistantMessage, content: reply }
     await AppStorage.saveMessage(chatId, finalMessage)
+
+    // Update branch structure if we're in a branch
+    const chat = chats.find(c => c.id === chatId)
+    if (!chat) return
+
+    // Find if we're at a branch point
+    for (const [indexStr, branchData] of Object.entries(messageBranches)) {
+      const index = parseInt(indexStr)
+      const baseMessages = chat.messages.slice(0, index + 1)
+      
+      // If our current messages start with this base, we're in this branch
+      if (chat.messages.length > baseMessages.length &&
+          chat.messages.slice(0, baseMessages.length).every((msg, i) => msg.id === baseMessages[i]?.id)) {
+        
+        // Get messages after the branch point
+        const branchMessages = chat.messages.slice(index + 1)
+        
+        // Update the current branch with new messages
+        setMessageBranches(prev => ({
+          ...prev,
+          [index]: {
+            ...prev[index],
+            branches: prev[index].branches.map((branch, i) => 
+              i === prev[index].currentBranch ? branchMessages : branch
+            )
+          }
+        }))
+        break
+      }
+    }
   }
 
   const handleSendMessage = async () => {
@@ -1163,6 +1375,13 @@ function App() {
                             <div className="msg-actions">
                               <button
                                 className="msg-action-btn"
+                                onClick={() => handleCopyMessage(msg.content)}
+                                title="Copy"
+                              >
+                                <Copy size={14} />
+                              </button>
+                              <button
+                                className="msg-action-btn"
                                 onClick={() => handleEditMessage(msg.id, msg.content)}
                                 title="Edit message"
                                 disabled={isTyping}
@@ -1175,6 +1394,40 @@ function App() {
                           {/* Action buttons for AI messages */}
                           {msg.role === 'assistant' && (
                             <div className="msg-actions">
+                              {/* Branch navigation */}
+                              {getBranchInfo(index) && (
+                                <>
+                                  <button
+                                    className="msg-action-btn"
+                                    onClick={() => handleSwitchBranch(index, 'prev')}
+                                    title="Previous branch"
+                                    disabled={isTyping}
+                                  >
+                                    <ChevronLeft size={14} />
+                                  </button>
+                                  <span className="branch-indicator">
+                                    {getBranchInfo(index)!.current}/{getBranchInfo(index)!.total}
+                                  </span>
+                                  <button
+                                    className="msg-action-btn"
+                                    onClick={() => handleSwitchBranch(index, 'next')}
+                                    title="Next branch"
+                                    disabled={isTyping}
+                                  >
+                                    <ChevronRight size={14} />
+                                  </button>
+                                  <div className="action-divider"></div>
+                                </>
+                              )}
+                              
+                              <button
+                                className="msg-action-btn"
+                                onClick={() => handleCreateBranch(index)}
+                                title="Create alternate path from here"
+                                disabled={isTyping}
+                              >
+                                <GitBranch size={14} />
+                              </button>
                               <button
                                 className="msg-action-btn"
                                 onClick={() => handleCopyMessage(msg.content)}

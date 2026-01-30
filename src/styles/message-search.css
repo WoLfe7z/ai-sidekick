@@ -309,3 +309,62 @@
   justify-content: flex-end;
   margin-right: 8px;
 }
+
+/* ============================================
+   MESSAGE BRANCHING
+   ============================================ */
+
+.branch-indicator {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  font-weight: 600;
+  padding: 0 8px;
+  min-width: 40px;
+  text-align: center;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-divider {
+  width: 1px;
+  height: 16px;
+  background: #374151;
+  margin: 0 4px;
+  align-self: center;
+}
+
+/* Ensure msg-actions uses flexbox with center alignment */
+.msg-actions {
+  display: flex;
+  align-items: center;
+}
+
+/* Highlight AI messages with branches */
+.msg-row.assistant:has(+ .msg-actions .branch-indicator) .msg-bubble {
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.1);
+}
+
+/* Branch button styling */
+.msg-action-btn:has(.lucide-git-branch) {
+  color: #60a5fa;
+}
+
+.msg-action-btn:has(.lucide-git-branch):hover:not(:disabled) {
+  background: rgba(30, 64, 175, 0.2);
+  color: #93c5fd;
+}
+
+/* Branch navigation buttons */
+.msg-action-btn:has(.lucide-chevron-left),
+.msg-action-btn:has(.lucide-chevron-right) {
+  color: #9ca3af;
+}
+
+.msg-action-btn:has(.lucide-chevron-left):hover:not(:disabled),
+.msg-action-btn:has(.lucide-chevron-right):hover:not(:disabled) {
+  color: #e5e7eb;
+  background: #374151;
+}
