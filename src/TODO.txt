@@ -1,0 +1,32 @@
+UI/UX Improvements:
+
+Dark/Light theme toggle - Add a theme switcher in the sidebar footer
+Chat export - Export chat history as text, markdown, or JSON
+Message timestamps - Show time sent on hover or below messages
+Empty state improvements - Better placeholder when no chats exist
+Scroll to bottom button - When new messages arrive and you're scrolled up
+Message selection - Select and copy multiple messages at once
+
+Features:
+
+Attachments - Make the paperclip button functional (upload images/files)
+Code highlighting - Detect and syntax highlight code blocks in messages
+Markdown rendering - Render markdown in AI responses (bold, lists, etc.)
+Chat folders/tags - Organize chats into categories
+Quick prompts - Saved prompt templates you can reuse
+Voice input - Speak your message instead of typing
+
+Functionality:
+
+DONE - Auto-save to localStorage - Persist chats between sessions
+Search within chat - Search messages in the current conversation
+Edit sent messages - Edit your message and regenerate AI response
+Message branching - Create alternate conversation paths from any message
+Chat analytics - Show word count, message count, etc.
+
+Polish:
+
+Loading states - Better loading animations
+Keyboard navigation - Navigate chats with arrow keys
+Animations - Smooth transitions when messages appear
+Tooltips - More helpful tooltips throughout

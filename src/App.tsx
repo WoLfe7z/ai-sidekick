@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react' 
-import LZString from 'lz-string'
 import './styles/base.css'
 import './styles/sidebar.css'
 import './styles/chat.css'
@@ -11,61 +10,156 @@ import './styles/shortcut.css'
 import { Chat, Message } from './types/chat'
 import { createNewChat, addMessageToChat } from './state/chatStore'
 
-// Type for shortcuts
-type Shortcuts = {
-  favorite: string
-  rename: string
-  delete: string
-  deselect: string
-}
-
-// Local storage functions
-const saveChatsToStorage = (chatsToSave: Chat[]) => {
-  try {
-    const compressed = LZString.compress(JSON.stringify(chatsToSave))
-    localStorage.setItem('chats', compressed)
-    localStorage.setItem('lastSaved', Date.now().toString())
-  } catch (error) {
-    console.error('Failed to save chats:', error)
-  }
-}
-
-const loadChatsFromStorage = (): Chat[] => {
-  try {
-    const saved = localStorage.getItem('chats')
-    if (saved) {
-      const decompressed = LZString.decompress(saved)
-      return decompressed ? JSON.parse(decompressed) : []
+// Declare window.ai for TypeScript
+declare global {
+  interface Window {
+    ai: {
+      explainText: (text: string) => Promise<string>
     }
-  } catch (error) {
-    console.error('Failed to load chats:', error)
-  }
-  return []
-}
-
-const clearChatsFromStorage = () => {
-  localStorage.removeItem('chats')
-  localStorage.removeItem('lastSaved')
-}
-
-const saveReactionsToStorage = (reactions: { [messageId: string]: 'like' | 'dislike' | null }) => {
-  try {
-    localStorage.setItem('messageReactions', JSON.stringify(reactions))
-  } catch (error) {
-    console.error('Failed to save reactions:', error)
+    require: any
   }
 }
 
-const loadReactionsFromStorage = (): { [messageId: string]: 'like' | 'dislike' | null } => {
-  try {
-    const saved = localStorage.getItem('messageReactions')
-    if (saved) {
-      return JSON.parse(saved)
+// Setup window.ai wrapper
+if (typeof window !== 'undefined') {
+  window.ai = {
+    explainText: async (text: string) => {
+      const { ipcRenderer } = window.require('electron')
+      return await ipcRenderer.invoke('ai:explain', text)
     }
-  } catch (error) {
-    console.error('Failed to load reactions:', error)
   }
-  return {}
+}
+
+// Storage utility class with database and electron-store
+class AppStorage {
+  // Initialize storage
+  static async initialize() {
+    const { ipcRenderer } = window.require('electron')
+    try {
+      await ipcRenderer.invoke('db:initialize')
+      console.log('✅ Database initialized')
+    } catch (error) {
+      console.error('❌ Failed to initialize database:', error)
+    }
+  }
+
+  // Save chat
+  static async saveChat(chat: Chat): Promise<void> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      await ipcRenderer.invoke('db:saveChat', chat)
+    } catch (error) {
+      console.error('❌ Failed to save chat:', error)
+    }
+  }
+
+  // Update chat
+  static async updateChat(chatId: string, updates: Partial<Chat>): Promise<void> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      await ipcRenderer.invoke('db:updateChat', chatId, updates)
+    } catch (error) {
+      console.error('❌ Failed to update chat:', error)
+    }
+  }
+
+  // Delete chat
+  static async deleteChat(chatId: string): Promise<void> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      await ipcRenderer.invoke('db:deleteChat', chatId)
+    } catch (error) {
+      console.error('❌ Failed to delete chat:', error)
+    }
+  }
+
+  // Load all chats
+  static async loadChats(): Promise<Chat[]> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      const chats = await ipcRenderer.invoke('db:loadChats')
+      return chats
+    } catch (error) {
+      console.error('❌ Failed to load chats:', error)
+      return []
+    }
+  }
+
+  // Load single chat with messages
+  static async loadChat(chatId: string): Promise<Chat | null> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      const chat = await ipcRenderer.invoke('db:loadChat', chatId)
+      return chat
+    } catch (error) {
+      console.error('❌ Failed to load chat:', error)
+      return null
+    }
+  }
+
+  // Save message
+  static async saveMessage(chatId: string, message: Message): Promise<void> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      await ipcRenderer.invoke('db:saveMessage', chatId, message)
+    } catch (error) {
+      console.error('❌ Failed to save message:', error)
+    }
+  }
+
+  // Save reaction
+  static async saveReaction(messageId: string, reaction: 'like' | 'dislike' | null): Promise<void> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      await ipcRenderer.invoke('db:saveReaction', messageId, reaction)
+    } catch (error) {
+      console.error('❌ Failed to save reaction:', error)
+    }
+  }
+
+  // Load reactions for a chat
+  static async loadReactions(chatId: string): Promise<{ [key: string]: 'like' | 'dislike' | null }> {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      const reactions = await ipcRenderer.invoke('db:loadReactions', chatId)
+      return reactions
+    } catch (error) {
+      console.error('❌ Failed to load reactions:', error)
+      return {}
+    }
+  }
+
+  // Get shortcuts
+  static getShortcuts() {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      const shortcuts = ipcRenderer.sendSync('store:get', 'shortcuts')
+      return shortcuts || {
+        favorite: 'f',
+        rename: 'r',
+        delete: 'delete',
+        deselect: 'escape'
+      }
+    } catch (error) {
+      console.error('❌ Failed to load shortcuts:', error)
+      return {
+        favorite: 'f',
+        rename: 'r',
+        delete: 'delete',
+        deselect: 'escape'
+      }
+    }
+  }
+
+  // Save shortcuts
+  static saveShortcuts(shortcuts: any): void {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      ipcRenderer.send('store:set', 'shortcuts', shortcuts)
+    } catch (error) {
+      console.error('❌ Failed to save shortcuts:', error)
+    }
+  }
 }
 
 function App() {
@@ -75,26 +169,28 @@ function App() {
   // Message reactions
   const [messageReactions, setMessageReactions] = useState<{
     [messageId: string]: 'like' | 'dislike' | null
-  }>(() => loadReactionsFromStorage())
+  }>({})
 
   const handleCopyMessage = (content: string) => {
     navigator.clipboard.writeText(content)
   }
 
-  const handleLikeMessage = (messageId: string) => {
-    const newReactions: { [messageId: string]: 'like' | 'dislike' | null } = {
-      ...messageReactions,
-      [messageId]: messageReactions[messageId] === 'like' ? null : 'like'
-    }
-    setMessageReactions(newReactions)
+  const handleLikeMessage = async (messageId: string) => {
+    const newReaction = messageReactions[messageId] === 'like' ? null : 'like'
+    setMessageReactions(prev => ({
+      ...prev,
+      [messageId]: newReaction
+    }))
+    await AppStorage.saveReaction(messageId, newReaction)
   }
 
-  const handleDislikeMessage = (messageId: string) => {
-    const newReactions: { [messageId: string]: 'like' | 'dislike' | null } = {
-      ...messageReactions,
-      [messageId]: messageReactions[messageId] === 'dislike' ? null : 'dislike'
-    }
-    setMessageReactions(newReactions)
+  const handleDislikeMessage = async (messageId: string) => {
+    const newReaction = messageReactions[messageId] === 'dislike' ? null : 'dislike'
+    setMessageReactions(prev => ({
+      ...prev,
+      [messageId]: newReaction
+    }))
+    await AppStorage.saveReaction(messageId, newReaction)
   }
 
   const handleRetryMessage = async (messageIndex: number) => {
@@ -111,10 +207,12 @@ function App() {
     setChats(prev =>
       prev.map(c => {
         if (c.id !== activeChatId) return c
-        return {
+        const updated = {
           ...c,
           messages: c.messages.slice(0, messageIndex)
         }
+        AppStorage.saveChat(updated) // Save to DB
+        return updated
       })
     )
     
@@ -138,6 +236,7 @@ function App() {
 
     // Add empty message
     setChats(prev => addMessageToChat(prev, activeChatId, assistantMessage))
+    await AppStorage.saveMessage(activeChatId, assistantMessage)
 
     // Stream the text character by character
     const chars = reply.split('')
@@ -160,10 +259,14 @@ function App() {
         })
       )
     }
+    
+    // Save final complete message
+    const finalMessage = { ...assistantMessage, content: reply }
+    await AppStorage.saveMessage(activeChatId, finalMessage)
   }
 
   // Chat state
-  const [chats, setChats] = useState<Chat[]>(() => loadChatsFromStorage())
+  const [chats, setChats] = useState<Chat[]>([])
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [isTyping, setIsTyping] = useState(false)
   const [userIsTyping, setUserIsTyping] = useState(false)
@@ -217,26 +320,42 @@ function App() {
   const deleteTimeoutRef = useRef<number | null>(null)
 
   // Shortcuts
-  const [shortcuts, setShortcuts] = useState(() => {
-    try {
-      const saved = localStorage.getItem('shortcuts')
-      if (saved) return JSON.parse(saved)
-    } catch (error) {
-      console.error('Failed to load shortcuts:', error)
-    }
-    return {
-      favorite: 'f',
-      rename: 'r',
-      delete: 'delete',
-      deselect: 'escape'
-    }
-  })
+  const [shortcuts, setShortcuts] = useState(() => AppStorage.getShortcuts())
   const [editingShortcut, setEditingShortcut] = useState<keyof typeof shortcuts | null>(null)
 
-  // Chat save consts
-  const chatsRef = useRef(chats)
-  const reactionsRef = useRef(messageReactions)
-  const shortcutsRef = useRef(shortcuts)
+  // Initialize database and load data
+  useEffect(() => {
+    const loadData = async () => {
+      await AppStorage.initialize()
+      const loadedChats = await AppStorage.loadChats()
+      setChats(loadedChats)
+    }
+    loadData()
+  }, [])
+
+  // Load messages and reactions when active chat changes
+  useEffect(() => {
+    const loadChatData = async () => {
+      if (!activeChatId) {
+        setMessageReactions({})
+        return
+      }
+
+      const chat = await AppStorage.loadChat(activeChatId)
+      if (chat) {
+        setChats(prev => prev.map(c => c.id === activeChatId ? chat : c))
+      }
+
+      const reactions = await AppStorage.loadReactions(activeChatId)
+      setMessageReactions(reactions)
+    }
+    loadChatData()
+  }, [activeChatId])
+
+  // Save shortcuts when they change
+  useEffect(() => {
+    AppStorage.saveShortcuts(shortcuts)
+  }, [shortcuts])
 
   // Function to read from clipboard and set input
   const addSystemMessage = (text: string) => {
@@ -249,12 +368,14 @@ function App() {
 
     if (!activeChatId) {
       const newChat = createNewChat(systemMessage)
-      setChats(prev => [newChat, ...prev]) // Append
+      setChats(prev => [newChat, ...prev])
       setActiveChatId(newChat.id)
+      AppStorage.saveChat(newChat) // Save to DB
       return
     }
 
     setChats(prev => addMessageToChat(prev, activeChatId, systemMessage))
+    AppStorage.saveMessage(activeChatId, systemMessage) // Save to DB
   }
 
   const handleExplainClipboard = async () => {
@@ -291,6 +412,7 @@ function App() {
       setActiveChatId(newChat.id)
       activeChatIdRef.current = newChat.id
       chatId = newChat.id
+      await AppStorage.saveChat(newChat) // Save to DB
     }
 
     const userMessage: Message = {
@@ -300,8 +422,9 @@ function App() {
       timestamp: Date.now()
     }
 
-    // Append message, DO NOT replace chats
+    // Append message
     setChats(prev => addMessageToChat(prev, chatId!, userMessage))
+    await AppStorage.saveMessage(chatId, userMessage) // Save to DB
 
     // Show typing indicator
     setIsTyping(true)
@@ -326,7 +449,7 @@ function App() {
     // Stream the text character by character
     const chars = reply.split('')
     for (let i = 0; i < chars.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 20)) // 20ms delay per character
+      await new Promise(resolve => setTimeout(resolve, 20))
       
       setChats(prev => 
         prev.map(chat => {
@@ -344,14 +467,18 @@ function App() {
         })
       )
     }
+    
+    // Save final complete message
+    const finalMessage = { ...assistantMessage, content: reply }
+    await AppStorage.saveMessage(chatId, finalMessage)
   }
 
   const handleSendMessage = async () => {
     if (!messageInput.trim() || isTyping) return
     
     const message = messageInput.trim()
-    setMessageInput('') // Clear input immediately
-    setUserIsTyping(false) // Clear typing indicator
+    setMessageInput('')
+    setUserIsTyping(false)
     
     await handleExplain(message)
   }
@@ -364,7 +491,7 @@ function App() {
   }
 
   // Delete chat function extracted for reuse
-  const deleteChatById = (chatId: string) => {
+  const deleteChatById = async (chatId: string) => {
     const chat = chats.find(c => c.id === chatId)
     if (!chat) return
 
@@ -382,10 +509,11 @@ function App() {
 
     setRecentlyDeletedChat(chat)
 
-    deleteTimeoutRef.current = window.setTimeout(() => {
+    deleteTimeoutRef.current = window.setTimeout(async () => {
       setChats(prev => prev.filter(c => c.id !== chat.id))
       setRecentlyDeletedChat(null)
       deleteTimeoutRef.current = null
+      await AppStorage.deleteChat(chatId) // Delete from DB
     }, 4000)
   }
 
@@ -399,10 +527,11 @@ function App() {
       await handleExplainClipboard()
     }
 
-    window.ipcRenderer.on('trigger-explain-clipboard', handleHotKey)
+    const { ipcRenderer } = window.require('electron')
+    ipcRenderer.on('trigger-explain-clipboard', handleHotKey)
 
     return () => {
-      window.ipcRenderer.off('trigger-explain-clipboard', handleHotKey)
+      ipcRenderer.removeAllListeners('trigger-explain-clipboard')
     }
   }, [])
 
@@ -435,7 +564,7 @@ function App() {
       const sel = window.getSelection()
 
       range.selectNodeContents(el)
-      range.collapse(false) // move caret to END
+      range.collapse(false)
       sel?.removeAllRanges()
       sel?.addRange(range)
     })
@@ -445,24 +574,24 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (editingShortcut) return
 
-      // Ignore if typing in an editable field
       const target = e.target as HTMLElement
       if (target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(target.tagName)) return
       if (!activeChatId) return
 
-      // Handle keyboard shortcuts for active chat
       const key = e.key.toLowerCase()
       switch (key) {
         case shortcuts.favorite:
           e.preventDefault()
-          setChats(prev => {
-            const newChats = prev.map(c =>
-              c.id === activeChatId
-                ? { ...c, favorite: !c.favorite }
-                : c
-            )
-            return newChats
-          })
+          setChats(prev =>
+            prev.map(c => {
+              if (c.id === activeChatId) {
+                const updated = { ...c, favorite: !c.favorite }
+                AppStorage.updateChat(activeChatId, { favorite: updated.favorite })
+                return updated
+              }
+              return c
+            })
+          )
           break
 
         case shortcuts.rename:
@@ -476,7 +605,7 @@ function App() {
           break
           
         case 'delete':
-        case 'backspace':     // for Mac keyboards
+        case 'backspace':
           e.preventDefault()
           deleteChatById(activeChatId)
           break
@@ -485,7 +614,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeChatId, chats])
+  }, [activeChatId, chats, shortcuts])
 
   useEffect(() => {
     if (!editingShortcut) return
@@ -498,7 +627,7 @@ function App() {
         return
       }
 
-      setShortcuts((prev: { favorite: string; rename: string; delete: string; deselect: string }) => ({
+      setShortcuts((prev: typeof shortcuts) => ({
         ...prev,
         [editingShortcut]: e.key.toLowerCase()
       }))
@@ -528,37 +657,6 @@ function App() {
     }
   }, [sortDropdownOpen])
 
-  // Immediate save effects
-  useEffect(() => {
-    chatsRef.current = chats
-    saveChatsToStorage(chats) // Save immediately, no debounce
-  }, [chats])
-
-  useEffect(() => {
-    reactionsRef.current = messageReactions
-    saveReactionsToStorage(messageReactions) // Save immediately
-  }, [messageReactions])
-
-  useEffect(() => {
-    shortcutsRef.current = shortcuts
-    localStorage.setItem('shortcuts', JSON.stringify(shortcuts)) // Save immediately
-  }, [shortcuts])
-
-  // Before unload save as backup
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      saveChatsToStorage(chatsRef.current)
-      saveReactionsToStorage(reactionsRef.current)
-      localStorage.setItem('shortcuts', JSON.stringify(shortcutsRef.current))
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
-  }, [])
-
   const activeChat = chats.find(c => c.id === activeChatId)
 
   return (
@@ -567,10 +665,11 @@ function App() {
       <div className="sidebar">
         <button
           className="new-chat"
-          onClick={() => {
+          onClick={async () => {
             const newChat = createNewChat()
             setChats(prev => [newChat, ...prev])
             setActiveChatId(newChat.id)
+            await AppStorage.saveChat(newChat)
           }}
         >
           + New Chat
@@ -659,7 +758,7 @@ function App() {
           {getSortedChats().map(chat => (
             <div
               key={chat.id}
-              className={`chat-item ${chat.id === activeChatId ? 'active' : ''}${chat.isDeleting ? 'chat-deleting' : ''}`}
+              className={`chat-item ${chat.id === activeChatId ? 'active' : ''}${chat.isDeleting ? ' chat-deleting' : ''}`}
               onClick={() => {
                 if (renamingChatId) return
                 setActiveChatId(chat.id)
@@ -681,7 +780,7 @@ function App() {
                       contentEditable
                       suppressContentEditableWarning
                       autoFocus
-                      onBlur={e => {
+                      onBlur={async (e) => {
                         const value = e.currentTarget.textContent?.trim()
                         if (value) {
                           setChats(prev =>
@@ -689,6 +788,7 @@ function App() {
                               c.id === chat.id ? { ...c, title: value } : c
                             )
                           )
+                          await AppStorage.updateChat(chat.id, { title: value })
                         }
                         setRenamingChatId(null)
                       }}
@@ -715,16 +815,18 @@ function App() {
                   className={`chat-fav-icon ${
                     chat.favorite ? 'is-favorite fav-pop' : 'fav-burst'
                   }`}
-                  onClick={e => {
+                  onClick={async (e) => {
                     e.stopPropagation()
-                    setChats(prev => {
-                      const newChats = prev.map(c =>
-                        c.id === chat.id
-                          ? { ...c, favorite: !c.favorite }
-                          : c
-                      )
-                      return newChats
-                    })
+                    setChats(prev =>
+                      prev.map(c => {
+                        if (c.id === chat.id) {
+                          const updated = { ...c, favorite: !c.favorite }
+                          AppStorage.updateChat(chat.id, { favorite: updated.favorite })
+                          return updated
+                        }
+                        return c
+                      })
+                    )
                   }}
                 />
               </div>
@@ -955,15 +1057,17 @@ function App() {
           <div className='context-item'>
             <div
               className="context-left"
-              onClick={() => {
-                setChats(prev => {
-                  const newChats = prev.map(c =>
-                    c.id === chatContextMenu.chatId
-                      ? { ...c, favorite: !c.favorite }
-                      : c
-                  )
-                  return newChats
-                })
+              onClick={async () => {
+                setChats(prev =>
+                  prev.map(c => {
+                    if (c.id === chatContextMenu.chatId) {
+                      const updated = { ...c, favorite: !c.favorite }
+                      AppStorage.updateChat(chatContextMenu.chatId, { favorite: updated.favorite })
+                      return updated
+                    }
+                    return c
+                  })
+                )
                 setChatContextMenu(null)
               }}
             >
