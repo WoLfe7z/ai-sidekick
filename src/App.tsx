@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react' 
+import LZString from 'lz-string'
 import './styles/base.css'
 import './styles/sidebar.css'
 import './styles/chat.css'
@@ -10,6 +11,63 @@ import './styles/shortcut.css'
 import { Chat, Message } from './types/chat'
 import { createNewChat, addMessageToChat } from './state/chatStore'
 
+// Type for shortcuts
+type Shortcuts = {
+  favorite: string
+  rename: string
+  delete: string
+  deselect: string
+}
+
+// Local storage functions
+const saveChatsToStorage = (chatsToSave: Chat[]) => {
+  try {
+    const compressed = LZString.compress(JSON.stringify(chatsToSave))
+    localStorage.setItem('chats', compressed)
+    localStorage.setItem('lastSaved', Date.now().toString())
+  } catch (error) {
+    console.error('Failed to save chats:', error)
+  }
+}
+
+const loadChatsFromStorage = (): Chat[] => {
+  try {
+    const saved = localStorage.getItem('chats')
+    if (saved) {
+      const decompressed = LZString.decompress(saved)
+      return decompressed ? JSON.parse(decompressed) : []
+    }
+  } catch (error) {
+    console.error('Failed to load chats:', error)
+  }
+  return []
+}
+
+const clearChatsFromStorage = () => {
+  localStorage.removeItem('chats')
+  localStorage.removeItem('lastSaved')
+}
+
+const saveReactionsToStorage = (reactions: { [messageId: string]: 'like' | 'dislike' | null }) => {
+  try {
+    localStorage.setItem('messageReactions', JSON.stringify(reactions))
+  } catch (error) {
+    console.error('Failed to save reactions:', error)
+  }
+}
+
+const loadReactionsFromStorage = (): { [messageId: string]: 'like' | 'dislike' | null } => {
+  try {
+    const saved = localStorage.getItem('messageReactions')
+    if (saved) {
+      return JSON.parse(saved)
+    }
+  } catch (error) {
+    console.error('Failed to load reactions:', error)
+  }
+  return {}
+}
+
 function App() {
   type RightPanel = 'panel-chat' | 'panel-shortcuts'
   const [rightPanel, setRightPanel] = useState<RightPanel>('panel-chat')
@@ -17,24 +75,26 @@ function App() {
   // Message reactions
   const [messageReactions, setMessageReactions] = useState<{
     [messageId: string]: 'like' | 'dislike' | null
-  }>({})
+  }>(() => loadReactionsFromStorage())
 
   const handleCopyMessage = (content: string) => {
     navigator.clipboard.writeText(content)
   }
 
   const handleLikeMessage = (messageId: string) => {
-    setMessageReactions(prev => ({
-      ...prev,
-      [messageId]: prev[messageId] === 'like' ? null : 'like'
-    }))
+    const newReactions: { [messageId: string]: 'like' | 'dislike' | null } = {
+      ...messageReactions,
+      [messageId]: messageReactions[messageId] === 'like' ? null : 'like'
+    }
+    setMessageReactions(newReactions)
   }
 
   const handleDislikeMessage = (messageId: string) => {
-    setMessageReactions(prev => ({
-      ...prev,
-      [messageId]: prev[messageId] === 'dislike' ? null : 'dislike'
-    }))
+    const newReactions: { [messageId: string]: 'like' | 'dislike' | null } = {
+      ...messageReactions,
+      [messageId]: messageReactions[messageId] === 'dislike' ? null : 'dislike'
+    }
+    setMessageReactions(newReactions)
   }
 
   const handleRetryMessage = async (messageIndex: number) => {
@@ -103,7 +163,7 @@ function App() {
   }
 
   // Chat state
-  const [chats, setChats] = useState<Chat[]>([])
+  const [chats, setChats] = useState<Chat[]>(() => loadChatsFromStorage())
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [isTyping, setIsTyping] = useState(false)
   const [userIsTyping, setUserIsTyping] = useState(false)
@@ -157,13 +217,26 @@ function App() {
   const deleteTimeoutRef = useRef<number | null>(null)
 
   // Shortcuts
-  const [shortcuts, setShortcuts] = useState({
-    favorite: 'f',
-    rename : 'r',
-    delete : 'delete',
-    deselect : 'escape'
+  const [shortcuts, setShortcuts] = useState(() => {
+    try {
+      const saved = localStorage.getItem('shortcuts')
+      if (saved) return JSON.parse(saved)
+    } catch (error) {
+      console.error('Failed to load shortcuts:', error)
+    }
+    return {
+      favorite: 'f',
+      rename: 'r',
+      delete: 'delete',
+      deselect: 'escape'
+    }
   })
   const [editingShortcut, setEditingShortcut] = useState<keyof typeof shortcuts | null>(null)
+
+  // Chat save consts
+  const chatsRef = useRef(chats)
+  const reactionsRef = useRef(messageReactions)
+  const shortcutsRef = useRef(shortcuts)
 
   // Function to read from clipboard and set input
   const addSystemMessage = (text: string) => {
@@ -382,13 +455,14 @@ function App() {
       switch (key) {
         case shortcuts.favorite:
           e.preventDefault()
-          setChats(prev =>
-            prev.map(c =>
+          setChats(prev => {
+            const newChats = prev.map(c =>
               c.id === activeChatId
                 ? { ...c, favorite: !c.favorite }
                 : c
             )
-          )
+            return newChats
+          })
           break
 
         case shortcuts.rename:
@@ -424,7 +498,7 @@ function App() {
         return
       }
 
-      setShortcuts(prev => ({
+      setShortcuts((prev: { favorite: string; rename: string; delete: string; deselect: string }) => ({
         ...prev,
         [editingShortcut]: e.key.toLowerCase()
       }))
@@ -453,6 +527,37 @@ function App() {
       window.removeEventListener('click', closeSortDropdown)
     }
   }, [sortDropdownOpen])
+
+  // Immediate save effects
+  useEffect(() => {
+    chatsRef.current = chats
+    saveChatsToStorage(chats) // Save immediately, no debounce
+  }, [chats])
+
+  useEffect(() => {
+    reactionsRef.current = messageReactions
+    saveReactionsToStorage(messageReactions) // Save immediately
+  }, [messageReactions])
+
+  useEffect(() => {
+    shortcutsRef.current = shortcuts
+    localStorage.setItem('shortcuts', JSON.stringify(shortcuts)) // Save immediately
+  }, [shortcuts])
+
+  // Before unload save as backup
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveChatsToStorage(chatsRef.current)
+      saveReactionsToStorage(reactionsRef.current)
+      localStorage.setItem('shortcuts', JSON.stringify(shortcutsRef.current))
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [])
 
   const activeChat = chats.find(c => c.id === activeChatId)
 
@@ -612,13 +717,14 @@ function App() {
                   }`}
                   onClick={e => {
                     e.stopPropagation()
-                    setChats(prev =>
-                      prev.map(c =>
+                    setChats(prev => {
+                      const newChats = prev.map(c =>
                         c.id === chat.id
                           ? { ...c, favorite: !c.favorite }
                           : c
                       )
-                    )
+                      return newChats
+                    })
                   }}
                 />
               </div>
@@ -850,13 +956,14 @@ function App() {
             <div
               className="context-left"
               onClick={() => {
-                setChats(prev =>
-                  prev.map(c =>
+                setChats(prev => {
+                  const newChats = prev.map(c =>
                     c.id === chatContextMenu.chatId
                       ? { ...c, favorite: !c.favorite }
                       : c
                   )
-                )
+                  return newChats
+                })
                 setChatContextMenu(null)
               }}
             >
