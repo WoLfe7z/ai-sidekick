@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react' 
+import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, ChevronDown } from 'lucide-react' 
 import './styles/base.css'
 import './styles/sidebar.css'
 import './styles/chat.css'
 import './styles/context-menu.css'
 import './styles/shortcut.css'
+import './styles/message-search.css'
 
 // Chat history
 import { Chat, Message } from './types/chat'
@@ -175,6 +176,32 @@ function App() {
     navigator.clipboard.writeText(content)
   }
 
+  // Highlight search matches in message content
+  const highlightMatches = (text: string, isCurrentMatch: boolean) => {
+    if (!messageSearchQuery.trim()) return text
+    
+    const query = messageSearchQuery
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    const parts = text.split(regex)
+    
+    return (
+      <>
+        {parts.map((part, i) => 
+          regex.test(part) ? (
+            <mark 
+              key={i} 
+              className={isCurrentMatch ? 'search-match current-match' : 'search-match'}
+            >
+              {part}
+            </mark>
+          ) : (
+            part
+          )
+        )}
+      </>
+    )
+  }
+
   const handleLikeMessage = async (messageId: string) => {
     const newReaction = messageReactions[messageId] === 'like' ? null : 'like'
     setMessageReactions(prev => ({
@@ -322,6 +349,61 @@ function App() {
   // Shortcuts
   const [shortcuts, setShortcuts] = useState(() => AppStorage.getShortcuts())
   const [editingShortcut, setEditingShortcut] = useState<keyof typeof shortcuts | null>(null)
+
+  // Get active chat
+  const activeChat = chats.find(c => c.id === activeChatId)
+
+  // Message search state (must be after activeChat is defined)
+  const [messageSearchQuery, setMessageSearchQuery] = useState('')
+  const [messageSearchExpanded, setMessageSearchExpanded] = useState(false)
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0)
+  const messageSearchInputRef = useRef<HTMLInputElement>(null)
+  const matchedMessageRefs = useRef<HTMLDivElement[]>([])
+
+  // Get matched messages
+  const getMatchedMessages = () => {
+    if (!activeChat || !messageSearchQuery.trim()) return []
+    
+    const query = messageSearchQuery.toLowerCase()
+    return activeChat.messages
+      .map((msg, index) => ({ msg, index }))
+      .filter(({ msg }) => msg.content.toLowerCase().includes(query))
+  }
+
+  const matchedMessages = getMatchedMessages()
+  const totalMatches = matchedMessages.length
+
+  // Navigate to next/previous match
+  const navigateToMatch = (direction: 'next' | 'prev') => {
+    if (totalMatches === 0) return
+    
+    let newIndex = currentMatchIndex
+    if (direction === 'next') {
+      newIndex = (currentMatchIndex + 1) % totalMatches
+    } else {
+      newIndex = (currentMatchIndex - 1 + totalMatches) % totalMatches
+    }
+    
+    setCurrentMatchIndex(newIndex)
+    
+    // Scroll to matched message
+    const matchedElement = matchedMessageRefs.current[newIndex]
+    if (matchedElement) {
+      matchedElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+
+  // Reset search when chat changes
+  useEffect(() => {
+    setMessageSearchQuery('')
+    setMessageSearchExpanded(false)
+    setCurrentMatchIndex(0)
+  }, [activeChatId])
+
+  // Reset current match when query changes
+  useEffect(() => {
+    setCurrentMatchIndex(0)
+  }, [messageSearchQuery])
 
   // Initialize database and load data
   useEffect(() => {
@@ -572,6 +654,29 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+F / Cmd+F to open message search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f' && activeChatId && rightPanel === 'panel-chat') {
+        e.preventDefault()
+        setMessageSearchExpanded(true)
+        setTimeout(() => messageSearchInputRef.current?.focus(), 100)
+        return
+      }
+
+      // Enter / Shift+Enter to navigate search results
+      if (messageSearchExpanded && messageSearchQuery && document.activeElement === messageSearchInputRef.current) {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          navigateToMatch(e.shiftKey ? 'prev' : 'next')
+          return
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          setMessageSearchQuery('')
+          setMessageSearchExpanded(false)
+          return
+        }
+      }
+
       if (editingShortcut) return
 
       const target = e.target as HTMLElement
@@ -656,8 +761,6 @@ function App() {
       window.removeEventListener('click', closeSortDropdown)
     }
   }, [sortDropdownOpen])
-
-  const activeChat = chats.find(c => c.id === activeChatId)
 
   return (
     <div className="app">
@@ -850,55 +953,127 @@ function App() {
         <div className="right-panel-inner">
           {rightPanel === 'panel-chat' && (
             <div className="chat">
+              {/* Search bar */}
+              {activeChat && (
+                <div 
+                  className={`message-search-container ${messageSearchExpanded ? 'expanded' : ''}`}
+                  onMouseEnter={() => setMessageSearchExpanded(true)}
+                  onMouseLeave={() => {
+                    if (!messageSearchQuery) setMessageSearchExpanded(false)
+                  }}
+                >
+                  <div className="message-search-bar">
+                    <Search size={16} className="search-icon" />
+                    <input
+                      ref={messageSearchInputRef}
+                      type="text"
+                      className="message-search-input"
+                      placeholder="Search messages..."
+                      value={messageSearchQuery}
+                      onChange={(e) => setMessageSearchQuery(e.target.value)}
+                      onFocus={() => setMessageSearchExpanded(true)}
+                    />
+                    {messageSearchQuery && (
+                      <>
+                        <span className="search-count">
+                          {totalMatches > 0 ? `${currentMatchIndex + 1}/${totalMatches}` : 'No matches'}
+                        </span>
+                        <button
+                          className="search-nav-btn"
+                          onClick={() => navigateToMatch('prev')}
+                          disabled={totalMatches === 0}
+                          title="Previous match"
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button
+                          className="search-nav-btn"
+                          onClick={() => navigateToMatch('next')}
+                          disabled={totalMatches === 0}
+                          title="Next match"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                        <button
+                          className="search-clear-btn"
+                          onClick={() => {
+                            setMessageSearchQuery('')
+                            setMessageSearchExpanded(false)
+                          }}
+                          title="Clear search"
+                        >
+                          <X size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               <div className="chat-inner">
                 {activeChat ? (
                   <>
-                    {activeChat.messages.map((msg, index) => (
-                      <div key={msg.id}>
-                        <div className={`msg-row ${msg.role}`}>
-                          <div className="msg-bubble">
-                            {msg.role === 'assistant' && <div className="msg-label">AI</div>}
-                            {msg.role === 'user' && <div className="msg-label">You</div>}
-                            <div className="msg-content">{msg.content}</div>
+                    {activeChat.messages.map((msg, index) => {
+                      const matchIndex = matchedMessages.findIndex(m => m.index === index)
+                      const isMatched = matchIndex !== -1
+                      const isCurrentMatch = isMatched && matchIndex === currentMatchIndex
+                      
+                      return (
+                        <div 
+                          key={msg.id}
+                          ref={(el) => {
+                            if (isMatched && el) {
+                              matchedMessageRefs.current[matchIndex] = el
+                            }
+                          }}
+                        >
+                          <div className={`msg-row ${msg.role}`}>
+                            <div className="msg-bubble">
+                              {msg.role === 'assistant' && <div className="msg-label">AI</div>}
+                              {msg.role === 'user' && <div className="msg-label">You</div>}
+                              <div className="msg-content">
+                                {highlightMatches(msg.content, isCurrentMatch)}
+                              </div>
+                            </div>
                           </div>
+                          
+                          {/* Action buttons for AI messages */}
+                          {msg.role === 'assistant' && (
+                            <div className="msg-actions">
+                              <button
+                                className="msg-action-btn"
+                                onClick={() => handleCopyMessage(msg.content)}
+                                title="Copy"
+                              >
+                                <Copy size={14} />
+                              </button>
+                              <button
+                                className={`msg-action-btn ${messageReactions[msg.id] === 'like' ? 'active-like' : ''}`}
+                                onClick={() => handleLikeMessage(msg.id)}
+                                title="Like"
+                              >
+                                <ThumbsUp size={14} />
+                              </button>
+                              <button
+                                className={`msg-action-btn ${messageReactions[msg.id] === 'dislike' ? 'active-dislike' : ''}`}
+                                onClick={() => handleDislikeMessage(msg.id)}
+                                title="Dislike"
+                              >
+                                <ThumbsDown size={14} />
+                              </button>
+                              <button
+                                className="msg-action-btn"
+                                onClick={() => handleRetryMessage(index)}
+                                title="Retry"
+                                disabled={isTyping}
+                              >
+                                <RotateCcw size={14} />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        
-                        {/* Action buttons for AI messages */}
-                        {msg.role === 'assistant' && (
-                          <div className="msg-actions">
-                            <button
-                              className="msg-action-btn"
-                              onClick={() => handleCopyMessage(msg.content)}
-                              title="Copy"
-                            >
-                              <Copy size={14} />
-                            </button>
-                            <button
-                              className={`msg-action-btn ${messageReactions[msg.id] === 'like' ? 'active-like' : ''}`}
-                              onClick={() => handleLikeMessage(msg.id)}
-                              title="Like"
-                            >
-                              <ThumbsUp size={14} />
-                            </button>
-                            <button
-                              className={`msg-action-btn ${messageReactions[msg.id] === 'dislike' ? 'active-dislike' : ''}`}
-                              onClick={() => handleDislikeMessage(msg.id)}
-                              title="Dislike"
-                            >
-                              <ThumbsDown size={14} />
-                            </button>
-                            <button
-                              className="msg-action-btn"
-                              onClick={() => handleRetryMessage(index)}
-                              title="Retry"
-                              disabled={isTyping}
-                            >
-                              <RotateCcw size={14} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      )
+                    })}
                     {userIsTyping && (
                       <div className="typing-indicator user-typing">
                         <div className="typing-bubble user-typing-bubble">
