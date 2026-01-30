@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, ChevronDown, Edit2, Check, GitBranch, ChevronLeft, ChevronRight } from 'lucide-react' 
+import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, ChevronDown, Edit2, Check, GitBranch, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react' 
 import './styles/base.css'
 import './styles/sidebar.css'
 import './styles/chat.css'
 import './styles/context-menu.css'
 import './styles/shortcut.css'
 import './styles/message-search.css'
+import './styles/analytics.css'
 
 // Chat history
 import { Chat, Message } from './types/chat'
@@ -186,7 +187,7 @@ class AppStorage {
 }
 
 function App() {
-  type RightPanel = 'panel-chat' | 'panel-shortcuts'
+  type RightPanel = 'panel-chat' | 'panel-shortcuts' | 'panel-analytics'
   const [rightPanel, setRightPanel] = useState<RightPanel>('panel-chat')
 
   // Message reactions
@@ -514,6 +515,60 @@ function App() {
     return {
       current: branchData.currentBranch + 1,
       total: branchData.branches.length
+    }
+  }
+
+  // Analytics calculations
+  const getAnalytics = () => {
+    const totalChats = chats.length
+    const totalMessages = chats.reduce((sum, chat) => sum + chat.messages.length, 0)
+    const userMessages = chats.reduce((sum, chat) => 
+      sum + chat.messages.filter(m => m.role === 'user').length, 0)
+    const aiMessages = chats.reduce((sum, chat) => 
+      sum + chat.messages.filter(m => m.role === 'assistant').length, 0)
+    
+    // Estimate tokens (rough approximation: 1 token ≈ 4 characters)
+    const totalCharacters = chats.reduce((sum, chat) => 
+      sum + chat.messages.reduce((msgSum, msg) => msgSum + msg.content.length, 0), 0)
+    const estimatedTokens = Math.round(totalCharacters / 4)
+
+    // Current chat stats
+    const currentChatStats = activeChat ? {
+      messages: activeChat.messages.length,
+      userMessages: activeChat.messages.filter(m => m.role === 'user').length,
+      aiMessages: activeChat.messages.filter(m => m.role === 'assistant').length,
+      words: activeChat.messages.reduce((sum, msg) => 
+        sum + msg.content.split(/\s+/).filter(w => w.length > 0).length, 0),
+      characters: activeChat.messages.reduce((sum, msg) => sum + msg.content.length, 0),
+      estimatedTokens: Math.round(
+        activeChat.messages.reduce((sum, msg) => sum + msg.content.length, 0) / 4
+      )
+    } : null
+
+    // Activity by date
+    const messagesByDate: { [date: string]: number } = {}
+    chats.forEach(chat => {
+      chat.messages.forEach(msg => {
+        const date = new Date(msg.timestamp).toLocaleDateString()
+        messagesByDate[date] = (messagesByDate[date] || 0) + 1
+      })
+    })
+
+    const sortedDates = Object.entries(messagesByDate)
+      .sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime())
+      .slice(-7) // Last 7 days
+
+    return {
+      overall: {
+        totalChats,
+        totalMessages,
+        userMessages,
+        aiMessages,
+        estimatedTokens,
+        favoriteChats: chats.filter(c => c.favorite).length
+      },
+      currentChat: currentChatStats,
+      activity: sortedDates
     }
   }
 
@@ -1231,6 +1286,13 @@ function App() {
         <div className="sidebar-footer">
           <button
             className="sidebar-icon-button"
+            title="Analytics"
+            onClick={() => setRightPanel(prev => prev === 'panel-analytics' ? 'panel-chat' : 'panel-analytics')}
+          >
+            <BarChart3 size={18} />
+          </button>
+          <button
+            className="sidebar-icon-button"
             title="Keyboard shortcuts"
             onClick={() => setRightPanel(prev => prev === 'panel-shortcuts' ? 'panel-chat' : 'panel-shortcuts')}
           >
@@ -1619,6 +1681,117 @@ function App() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {rightPanel === 'panel-analytics' && (
+            <div className="analytics-panel">
+              <div className="analytics-header">
+                <h2>Analytics</h2>
+                <p>Statistics about your chats and messages</p>
+              </div>
+
+              <div className="analytics-content">
+                {(() => {
+                  const analytics = getAnalytics()
+                  
+                  return (
+                    <>
+                      {/* Overall Stats */}
+                      <div className="analytics-section">
+                        <h3 className="analytics-section-title">Overall Statistics</h3>
+                        <div className="stats-grid">
+                          <div className="stat-card">
+                            <div className="stat-value">{analytics.overall.totalChats}</div>
+                            <div className="stat-label">Total Chats</div>
+                          </div>
+                          <div className="stat-card">
+                            <div className="stat-value">{analytics.overall.totalMessages}</div>
+                            <div className="stat-label">Total Messages</div>
+                          </div>
+                          <div className="stat-card">
+                            <div className="stat-value">{analytics.overall.userMessages}</div>
+                            <div className="stat-label">Your Messages</div>
+                          </div>
+                          <div className="stat-card">
+                            <div className="stat-value">{analytics.overall.aiMessages}</div>
+                            <div className="stat-label">AI Responses</div>
+                          </div>
+                          <div className="stat-card">
+                            <div className="stat-value">{analytics.overall.favoriteChats}</div>
+                            <div className="stat-label">Favorite Chats</div>
+                          </div>
+                          <div className="stat-card">
+                            <div className="stat-value">{analytics.overall.estimatedTokens.toLocaleString()}</div>
+                            <div className="stat-label">Est. Tokens Used</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Current Chat Stats */}
+                      {analytics.currentChat && (
+                        <div className="analytics-section">
+                          <h3 className="analytics-section-title">Current Chat</h3>
+                          <div className="stats-grid">
+                            <div className="stat-card">
+                              <div className="stat-value">{analytics.currentChat.messages}</div>
+                              <div className="stat-label">Messages</div>
+                            </div>
+                            <div className="stat-card">
+                              <div className="stat-value">{analytics.currentChat.words.toLocaleString()}</div>
+                              <div className="stat-label">Words</div>
+                            </div>
+                            <div className="stat-card">
+                              <div className="stat-value">{analytics.currentChat.characters.toLocaleString()}</div>
+                              <div className="stat-label">Characters</div>
+                            </div>
+                            <div className="stat-card">
+                              <div className="stat-value">{analytics.currentChat.estimatedTokens.toLocaleString()}</div>
+                              <div className="stat-label">Est. Tokens</div>
+                            </div>
+                            <div className="stat-card">
+                              <div className="stat-value">{analytics.currentChat.userMessages}</div>
+                              <div className="stat-label">Your Messages</div>
+                            </div>
+                            <div className="stat-card">
+                              <div className="stat-value">{analytics.currentChat.aiMessages}</div>
+                              <div className="stat-label">AI Responses</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Activity */}
+                      <div className="analytics-section">
+                        <h3 className="analytics-section-title">Recent Activity (Last 7 Days)</h3>
+                        <div className="activity-chart">
+                          {analytics.activity.length > 0 ? (
+                            analytics.activity.map(([date, count]) => {
+                              const maxCount = Math.max(...analytics.activity.map(([_, c]) => c))
+                              const percentage = (count / maxCount) * 100
+                              
+                              return (
+                                <div key={date} className="activity-bar-container">
+                                  <div className="activity-date">{date}</div>
+                                  <div className="activity-bar-wrapper">
+                                    <div 
+                                      className="activity-bar" 
+                                      style={{ width: `${percentage}%` }}
+                                    ></div>
+                                  </div>
+                                  <div className="activity-count">{count}</div>
+                                </div>
+                              )
+                            })
+                          ) : (
+                            <div className="no-activity">No messages yet</div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             </div>
           )}

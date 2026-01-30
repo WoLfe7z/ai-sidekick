@@ -1,0 +1,162 @@
+/* ============================================
+   ANALYTICS PANEL
+   ============================================ */
+
+.analytics-panel {
+  flex: 1;
+  padding: 48px;
+  overflow-y: auto;
+}
+
+.analytics-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.analytics-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.analytics-panel::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+
+.analytics-panel::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
+.analytics-header {
+  margin-bottom: 32px;
+}
+
+.analytics-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: #e5e7eb;
+}
+
+.analytics-header p {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.analytics-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 900px;
+}
+
+.analytics-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.analytics-section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e5e7eb;
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.stat-card {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+
+.stat-card:hover {
+  background: #222;
+  border-color: #333;
+  transform: translateY(-2px);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #60a5fa;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  text-align: center;
+}
+
+/* Activity Chart */
+.activity-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.activity-bar-container {
+  display: grid;
+  grid-template-columns: 100px 1fr 50px;
+  align-items: center;
+  gap: 12px;
+}
+
+.activity-date {
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.activity-bar-wrapper {
+  background: #0a0a0a;
+  border-radius: 4px;
+  height: 24px;
+  overflow: hidden;
+}
+
+.activity-bar {
+  background: linear-gradient(90deg, #1e40af, #60a5fa);
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  min-width: 2px;
+}
+
+.activity-count {
+  font-size: 0.9rem;
+  color: #e5e7eb;
+  font-weight: 600;
+  text-align: right;
+}
+
+.no-activity {
+  text-align: center;
+  color: #6b7280;
+  padding: 40px;
+  font-style: italic;
+}
+
+/* Sidebar footer spacing for multiple buttons */
+.sidebar-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}

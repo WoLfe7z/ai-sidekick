@@ -8,6 +8,23 @@
   overflow-y: auto;
 }
 
+.shortcuts-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.shortcuts-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.shortcuts-panel::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+
+.shortcuts-panel::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
 .shortcuts-header {
   margin-bottom: 32px;
 }
