@@ -5,7 +5,7 @@ import './styles/sidebar.css'
 import './styles/chat.css'
 import './styles/context-menu.css'
 import './styles/shortcut.css'
-import './styles/message-search.css'
+import './styles/message-actions.css'
 import './styles/analytics.css'
 import './styles/file-upload.css'
 import './styles/code-highlight.css'
@@ -488,6 +488,11 @@ function App() {
   const handleSwitchBranch = (messageIndex: number, direction: 'prev' | 'next') => {
     if (!activeChatId) return
 
+    // Cancel any ongoing AI response
+    if (isTyping) {
+      setIsTyping(false)
+    }
+
     const chat = chats.find(c => c.id === activeChatId)
     if (!chat) return
 
@@ -557,6 +562,66 @@ function App() {
     return {
       current: branchData.currentBranch + 1,
       total: branchData.branches.length
+    }
+  }
+
+  // Delete current branch
+  const handleDeleteBranch = (messageIndex: number) => {
+    if (!activeChatId) return
+
+    const branchKey = `${activeChatId}:${messageIndex}`
+    const branchData = messageBranches[branchKey]
+    if (!branchData || branchData.branches.length <= 1) return
+
+    const currentBranchIndex = branchData.currentBranch
+    const newBranches = branchData.branches.filter((_, i) => i !== currentBranchIndex)
+    
+    // If we deleted the last branch, switch to the previous one
+    const newCurrentIndex = currentBranchIndex >= newBranches.length 
+      ? newBranches.length - 1 
+      : currentBranchIndex
+
+    if (newBranches.length === 0) {
+      // No branches left, remove branch structure entirely
+      setMessageBranches(prev => {
+        const updated = { ...prev }
+        delete updated[branchKey]
+        return updated
+      })
+      
+      // Show full conversation (no branching)
+      const chat = chats.find(c => c.id === activeChatId)
+      if (chat) {
+        AppStorage.saveChat(chat)
+      }
+    } else {
+      // Update branch structure
+      setMessageBranches(prev => ({
+        ...prev,
+        [branchKey]: {
+          branches: newBranches,
+          currentBranch: newCurrentIndex
+        }
+      }))
+
+      // Update visible messages
+      const chat = chats.find(c => c.id === activeChatId)
+      if (!chat) return
+
+      const baseMessages = chat.messages.slice(0, messageIndex + 1)
+      const branchMessages = newBranches[newCurrentIndex]
+
+      setChats(prev =>
+        prev.map(c => {
+          if (c.id !== activeChatId) return c
+          const updated = {
+            ...c,
+            messages: [...baseMessages, ...branchMessages]
+          }
+          AppStorage.saveChat(updated)
+          return updated
+        })
+      )
     }
   }
 
@@ -879,10 +944,16 @@ function App() {
 
     const reply = await window.ai.explainText(text)
 
+    // Check if user switched chats/branches while waiting for response
+    if (activeChatIdRef.current !== chatId) {
+      setIsTyping(false)
+      return // Abort - user switched away
+    }
+
     // Hide typing indicator
     setIsTyping(false)
 
-    // Create assistant message with empty content initially
+    // Create assistant message
     const assistantMessageId = crypto.randomUUID()
     const assistantMessage: Message = {
       id: assistantMessageId,
@@ -894,33 +965,53 @@ function App() {
     // Add empty message
     setChats(prev => addMessageToChat(prev, chatId!, assistantMessage))
 
-    // Stream the text character by character
-    const chars = reply.split('')
-    for (let i = 0; i < chars.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 20))
-      
+    // Check if message should be shown instantly (errors or very short messages)
+    const shouldStreamMessage = reply.length > 10
+    
+    if (!shouldStreamMessage) {
+      // Show instantly for short messages and errors
+      const completeMessage = { ...assistantMessage, content: reply }
       setChats(prev => 
         prev.map(chat => {
           if (chat.id !== chatId) return chat
           return {
             ...chat,
-            messages: chat.messages.map(msg => {
-              if (msg.id !== assistantMessageId) return msg
-              return {
-                ...msg,
-                content: reply.substring(0, i + 1)
-              }
-            })
+            messages: chat.messages.map(msg => 
+              msg.id === assistantMessageId ? completeMessage : msg
+            )
           }
         })
       )
+      await AppStorage.saveMessage(chatId, completeMessage)
+    } else {
+      // Stream the text character by character for longer messages
+      const chars = reply.split('')
+      for (let i = 0; i < chars.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 20))
+        
+        setChats(prev => 
+          prev.map(chat => {
+            if (chat.id !== chatId) return chat
+            return {
+              ...chat,
+              messages: chat.messages.map(msg => {
+                if (msg.id !== assistantMessageId) return msg
+                return {
+                  ...msg,
+                  content: reply.substring(0, i + 1)
+                }
+              })
+            }
+          })
+        )
+      }
+      
+      // Save final complete message
+      const finalMessage = { ...assistantMessage, content: reply }
+      await AppStorage.saveMessage(chatId, finalMessage)
     }
     
-    // Save final complete message
-    const finalMessage = { ...assistantMessage, content: reply }
-    await AppStorage.saveMessage(chatId, finalMessage)
-
-    // Update branch structure if we're in a branch
+    // Update branch structure if we're in a branch (even if user switched away)
     const chat = chats.find(c => c.id === chatId)
     if (!chat) return
 
@@ -1558,6 +1649,14 @@ function App() {
                                     disabled={isTyping}
                                   >
                                     <ChevronRight size={14} />
+                                  </button>
+                                  <button
+                                    className="msg-action-btn branch-delete-btn"
+                                    onClick={() => handleDeleteBranch(index)}
+                                    title="Delete current branch"
+                                    disabled={isTyping || getBranchInfo(index)!.total <= 1}
+                                  >
+                                    <Trash2 size={14} />
                                   </button>
                                   <div className="action-divider"></div>
                                 </>

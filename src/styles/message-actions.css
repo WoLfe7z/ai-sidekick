@@ -368,3 +368,18 @@
   color: #e5e7eb;
   background: #374151;
 }
+
+/* Branch delete button */
+.branch-delete-btn {
+  color: #ef4444;
+}
+
+.branch-delete-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.branch-delete-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
