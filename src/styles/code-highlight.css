@@ -1,0 +1,132 @@
+/* ============================================
+   CODE SYNTAX HIGHLIGHTING
+   ============================================ */
+
+/* Inline code */
+.code-inline {
+  background: rgba(96, 165, 250, 0.1);
+  color: #93c5fd;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9em;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+/* Code block container */
+.code-block {
+  margin: 12px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0a0a0a;
+  border: 1px solid #1a1a1a;
+}
+
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.code-language {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #9ca3af;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.code-copy-btn:hover {
+  background: #2a2a2a;
+  border-color: #444;
+  color: #e5e7eb;
+}
+
+.code-pre {
+  margin: 0;
+  padding: 16px;
+  overflow-x: auto;
+  background: #0a0a0a;
+}
+
+.code-pre::-webkit-scrollbar {
+  height: 8px;
+}
+
+.code-pre::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+.code-pre::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+.code-pre::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
+.code-content {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #e5e7eb;
+  display: block;
+}
+
+/* Syntax highlighting colors */
+.code-keyword {
+  color: #c678dd; /* Purple for keywords */
+  font-weight: 600;
+}
+
+.code-string {
+  color: #98c379; /* Green for strings */
+}
+
+.code-comment {
+  color: #5c6370; /* Gray for comments */
+  font-style: italic;
+}
+
+.code-number {
+  color: #d19a66; /* Orange for numbers */
+}
+
+.code-function {
+  color: #61afef; /* Blue for functions */
+}
+
+.code-operator {
+  color: #56b6c2; /* Cyan for operators */
+}
+
+.code-variable {
+  color: #e06c75; /* Red for variables */
+}
+
+/* Message content code integration */
+.msg-content .code-block {
+  max-width: 100%;
+}
+
+.msg-content .code-inline {
+  word-break: break-word;
+}

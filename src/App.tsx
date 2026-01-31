@@ -8,11 +8,13 @@ import './styles/shortcut.css'
 import './styles/message-search.css'
 import './styles/analytics.css'
 import './styles/file-upload.css'
+import './styles/code-highlight.css'
 
 // Chat history
 import { Chat, Message } from './types/chat'
 import { createNewChat, addMessageToChat } from './state/chatStore'
 import { FileUploader, FilePreview, UploadedFile } from './components/fileUploader'
+import { CodeBlock, parseMessageWithCode } from './components/codeBlock'
 
 // Declare window.ai for TypeScript
 declare global {
@@ -215,27 +217,49 @@ function App() {
   }
 
   // Highlight search matches in message content
-  const highlightMatches = (text: string, isCurrentMatch: boolean) => {
-    if (!messageSearchQuery.trim()) return text
-    
-    const query = messageSearchQuery
-    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-    const parts = text.split(regex)
+  const renderMessageContent = (text: string, isCurrentMatch: boolean) => {
+    // First parse code blocks
+    const parts = parseMessageWithCode(text)
     
     return (
       <>
-        {parts.map((part, i) => 
-          regex.test(part) ? (
-            <mark 
-              key={i} 
-              className={isCurrentMatch ? 'search-match current-match' : 'search-match'}
-            >
-              {part}
-            </mark>
-          ) : (
-            part
-          )
-        )}
+        {parts.map((part, i) => {
+          if (typeof part === 'string') {
+            // Regular text - apply search highlighting if needed
+            if (!messageSearchQuery.trim()) return <span key={i}>{part}</span>
+            
+            const query = messageSearchQuery
+            const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+            const textParts = part.split(regex)
+            
+            return (
+              <span key={i}>
+                {textParts.map((textPart, j) => 
+                  regex.test(textPart) ? (
+                    <mark 
+                      key={j} 
+                      className={isCurrentMatch ? 'search-match current-match' : 'search-match'}
+                    >
+                      {textPart}
+                    </mark>
+                  ) : (
+                    textPart
+                  )
+                )}
+              </span>
+            )
+          } else {
+            // Code block
+            return (
+              <CodeBlock 
+                key={i}
+                code={part.code}
+                language={part.language}
+                inline={!part.language && part.code.length < 50}
+              />
+            )
+          }
+        })}
       </>
     )
   }
@@ -949,6 +973,12 @@ function App() {
     setAttachedFiles([])
     setUserIsTyping(false)
     
+    // Reset textarea height
+    const textarea = document.querySelector('.message-input') as HTMLTextAreaElement
+    if (textarea) {
+      textarea.style.height = 'auto'
+    }
+    
     await handleExplain(message)
   }
 
@@ -1467,7 +1497,7 @@ function App() {
                                 </div>
                               ) : (
                                 <div className="msg-content">
-                                  {highlightMatches(msg.content, isCurrentMatch)}
+                                  {renderMessageContent(msg.content, isCurrentMatch)}
                                 </div>
                               )}
                             </div>
