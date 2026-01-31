@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, ChevronDown, Edit2, Check, GitBranch, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react' 
+import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, ChevronDown, Edit2, Check, GitBranch, ChevronLeft, ChevronRight, BarChart3, Folder, Tag, Plus, Filter } from 'lucide-react' 
 import './styles/base.css'
 import './styles/sidebar.css'
 import './styles/chat.css'
@@ -10,6 +10,7 @@ import './styles/analytics.css'
 import './styles/file-upload.css'
 import './styles/code-highlight.css'
 import './styles/markdown.css'
+import './styles/folders.css'
 
 // Chat history
 import { Chat, Message } from './types/chat'
@@ -17,6 +18,16 @@ import { createNewChat, addMessageToChat } from './state/chatStore'
 import { FileUploader, FilePreview, UploadedFile } from './components/fileUploader'
 import { CodeBlock, parseMessageWithCode } from './components/codeBlock'
 import { parseMarkdown, renderMarkdown } from './components/markdownRenderer'
+
+// Extended Chat type for folder property
+interface ChatWithFolder extends Chat {
+  folder?: string
+}
+
+interface FolderData {
+  name: string
+  color: string
+}
 
 // Declare window.ai for TypeScript
 declare global {
@@ -188,6 +199,28 @@ class AppStorage {
     } catch (error) {
       console.error('❌ Failed to load branches:', error)
       return {}
+    }
+  }
+
+  // Get folders
+  static getFolders(): FolderData[] {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      const folders = ipcRenderer.sendSync('store:get', 'folders')
+      return folders || []
+    } catch (error) {
+      console.error('❌ Failed to load folders:', error)
+      return []
+    }
+  }
+
+  // Save folders
+  static saveFolders(folders: FolderData[]): void {
+    try {
+      const { ipcRenderer } = window.require('electron')
+      ipcRenderer.send('store:set', 'folders', folders)
+    } catch (error) {
+      console.error('❌ Failed to save folders:', error)
     }
   }
 }
@@ -690,15 +723,48 @@ function App() {
   const activeChatIdRef = useRef<string | null>(null)
 
   // Chat sorting
-  type SortOption = 'latest' | 'oldest' | 'favorite' | 'name'
+  type SortOption = 'latest' | 'oldest' | 'favorite' | 'name' | 'folder'
   const [sortBy, setSortBy] = useState<SortOption>('latest')
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Folders and tags
+  interface FolderData {
+    name: string
+    color: string
+  }
+
+  const [folders, setFolders] = useState<FolderData[]>(() => AppStorage.getFolders())
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [folderMenuOpen, setFolderMenuOpen] = useState(false)
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [newFolderColor, setNewFolderColor] = useState('#3b82f6')
+  const [colorPickerOpen, setColorPickerOpen] = useState(false)
+
+  // predefined color palette
+  const folderColors = [
+    '#3b82f6', // blue
+    '#10b981', // green
+    '#f59e0b', // amber
+    '#ef4444', // red
+    '#8b5cf6', // purple
+    '#ec4899', // pink
+    '#06b6d4', // cyan
+    '#84cc16', // lime
+  ]
+
   const getSortedChats = () => {
     let chatsCopy = [...chats]
     
-    // Filter by search query first
+    // Filter by folder if one is selected
+    if (selectedFolder) {
+      chatsCopy = chatsCopy.filter(chat => 
+        (chat as any).folder === selectedFolder
+      )
+    }
+    
+    // Filter by search query
     if (searchQuery.trim()) {
       chatsCopy = chatsCopy.filter(chat =>
         chat.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -719,12 +785,82 @@ function App() {
         })
       case 'name':
         return chatsCopy.sort((a, b) => a.title.localeCompare(b.title))
+      case 'folder':
+        return chatsCopy.sort((a, b) => {
+          const folderA = (a as any).folder || ''
+          const folderB = (b as any).folder || ''
+          if (folderA === folderB) return b.createdAt - a.createdAt
+          return folderA.localeCompare(folderB)
+        })
       default:
         return chatsCopy
     }
   }
 
+  // Helper function to get folder color
+  const getFolderColor = (folderName: string | undefined): string => {
+    if (!folderName) return '#3b82f6' // default blue
+    const folder = folders.find(f => f.name === folderName)
+    return folder?.color || '#3b82f6'
+  }
+
+  // Folder management
+  const handleCreateFolder = () => {
+    const name = newFolderName.trim()
+    if (name && !folders.some(f => f.name === name)) {
+      const updated = [...folders, { name, color: newFolderColor }]
+      setFolders(updated)
+      AppStorage.saveFolders(updated)
+      setNewFolderName('')
+      setNewFolderColor('#3b82f6') // Reset to default color
+      setIsCreatingFolder(false)
+    }
+  }
+
+  const handleDeleteFolder = (folderName: string) => {
+    // Remove folder from all chats
+    setChats(prev => prev.map(chat => {
+      if ((chat as any).folder === folderName) {
+        const updated = { ...chat } as any
+        delete updated.folder
+        // Use updateChat to only update the folder field
+        AppStorage.updateChat(chat.id, { folder: undefined } as any)
+        return updated
+      }
+      return chat
+    }))
+    
+    // Remove from folders list
+    const updated = folders.filter(f => f.name !== folderName)
+    setFolders(updated)
+    AppStorage.saveFolders(updated)
+    
+    // Clear selection if this folder was selected
+    if (selectedFolder === folderName) {
+      setSelectedFolder(null)
+    }
+  }
+
+  const handleMoveToFolder = (chatId: string, folderName: string | null) => {
+    setChats(prev => prev.map(chat => {
+      if (chat.id === chatId) {
+        const updated = { ...chat } as any
+        if (folderName === null) {
+          delete updated.folder
+        } else {
+          updated.folder = folderName
+        }
+        AppStorage.saveChat(updated)
+        return updated
+      }
+      return chat
+    }))
+    setChatContextMenu(null)
+    setFolderSubmenuOpen(null)
+  }
+
   // Chat context menu states
+  const [folderSubmenuOpen, setFolderSubmenuOpen] = useState<string | null>(null)
   const [chatContextMenu, setChatContextMenu] = useState<{
     x: number
     y: number
@@ -835,20 +971,48 @@ function App() {
               // Get current branch messages
               const currentBranchMessages = branchData.branches[branchData.currentBranch] || []
               
-              // Update chat with reconstructed messages
+              // Update chat with reconstructed messages (preserve existing properties like folder)
               const reconstructedChat = {
                 ...chat,
                 messages: [...baseMessages, ...currentBranchMessages]
               }
-              setChats(prev => prev.map(c => c.id === activeChatId ? reconstructedChat : c))
+              setChats(prev => prev.map(c => {
+                if (c.id !== activeChatId) return c
+                // Only update if loaded chat has more messages, or preserve existing
+                if (reconstructedChat.messages.length >= c.messages.length) {
+                  return { ...c, ...reconstructedChat }
+                }
+                return c
+              }))
             } else {
-              setChats(prev => prev.map(c => c.id === activeChatId ? chat : c))
+              setChats(prev => prev.map(c => {
+                if (c.id !== activeChatId) return c
+                // Only update if loaded chat has more messages
+                if (chat.messages.length >= c.messages.length) {
+                  return { ...c, ...chat }
+                }
+                return c
+              }))
             }
           } else {
-            setChats(prev => prev.map(c => c.id === activeChatId ? chat : c))
+            setChats(prev => prev.map(c => {
+              if (c.id !== activeChatId) return c
+              // Only update if loaded chat has more messages
+              if (chat.messages.length >= c.messages.length) {
+                return { ...c, ...chat }
+              }
+              return c
+            }))
           }
         } else {
-          setChats(prev => prev.map(c => c.id === activeChatId ? chat : c))
+          setChats(prev => prev.map(c => {
+            if (c.id !== activeChatId) return c
+            // Only update if loaded chat has more messages
+            if (chat.messages.length >= c.messages.length) {
+              return { ...c, ...chat }
+            }
+            return c
+          }))
         }
       }
 
@@ -1280,6 +1444,29 @@ function App() {
     }
   }, [sortDropdownOpen])
 
+  // Close submenus
+  useEffect(() => {
+    const handleClick = () => {
+      setFolderSubmenuOpen(null)
+    }
+    
+    window.addEventListener('click', handleClick)
+    return () => window.removeEventListener('click', handleClick)
+  }, [])
+
+  // Close color picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (colorPickerOpen && !target.closest('.folder-color-dropdown')) {
+        setColorPickerOpen(false)
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [colorPickerOpen])
+
   return (
     <div className="app">
       {/* Sidebar */}
@@ -1328,6 +1515,7 @@ function App() {
               sortBy === 'latest' ? 'Latest First' :
               sortBy === 'oldest' ? 'Oldest First' :
               sortBy === 'favorite' ? 'Favorites First' :
+              sortBy === 'folder' ? 'By Folder' :
               'Alphabetical'
             }</span>
             <span className="sort-arrow">{sortDropdownOpen ? '▲' : '▼'}</span>
@@ -1335,6 +1523,15 @@ function App() {
 
           {sortDropdownOpen && (
             <div className="sort-dropdown">
+              <div 
+                className={`sort-option ${sortBy === 'folder' ? 'active' : ''}`}
+                onClick={() => {
+                  setSortBy('folder')
+                  setSortDropdownOpen(false)
+                }}
+              >
+                By Folder
+              </div>
               <div 
                 className={`sort-option ${sortBy === 'latest' ? 'active' : ''}`}
                 onClick={() => {
@@ -1363,6 +1560,15 @@ function App() {
                 Favorites First
               </div>
               <div 
+                className={`sort-option ${sortBy === 'folder' ? 'active' : ''}`}
+                onClick={() => {
+                  setSortBy('folder')
+                  setSortDropdownOpen(false)
+                }}
+              >
+                By Folder
+              </div>
+              <div 
                 className={`sort-option ${sortBy === 'name' ? 'active' : ''}`}
                 onClick={() => {
                   setSortBy('name')
@@ -1375,7 +1581,15 @@ function App() {
           )}
         </div>
 
-        <div className="chat-list">
+        <div 
+          className="chat-list"
+          onClick={(e) => {
+            // Only deselect if clicking directly on the chat-list background
+            if (e.target === e.currentTarget) {
+              setActiveChatId(null)
+            }
+          }}
+        >
           {getSortedChats().map(chat => (
             <div
               key={chat.id}
@@ -1428,6 +1642,19 @@ function App() {
                     </span>
                   ) : (
                     <div className="chat-title">{chat.title}</div>
+                  )}
+                  {(chat as ChatWithFolder).folder && (
+                    <span 
+                      className="chat-folder-tag"
+                      style={{
+                        backgroundColor: `${getFolderColor((chat as ChatWithFolder).folder)}20`,
+                        color: getFolderColor((chat as ChatWithFolder).folder),
+                        borderColor: getFolderColor((chat as ChatWithFolder).folder)
+                      }}
+                    >
+                      <Tag size={10} />
+                      {(chat as ChatWithFolder).folder}
+                    </span>
                   )}
                 </div>
 
@@ -1533,6 +1760,149 @@ function App() {
                     )}
                   </div>
                 </div>
+              )}
+
+              {/* Folder Bar - only show when no chat is selected */}
+              {!activeChatId && (
+              <div className="folder-bar">
+                <div className="folder-header">
+                  <div className="folder-title">Folders</div>
+                  <button 
+                    className="folder-add-btn"
+                    onClick={() => setIsCreatingFolder(!isCreatingFolder)}
+                  >
+                    <Plus size={12} />
+                    New
+                  </button>
+                </div>
+
+                <div className="folder-list">
+                  {/* All Chats */}
+                  <div 
+                    className={`folder-item ${selectedFolder === null ? 'active' : ''}`}
+                    onClick={() => setSelectedFolder(null)}
+                  >
+                    <div className="folder-item-left">
+                      <Folder size={14} />
+                      <span className="folder-item-name">All Chats</span>
+                    </div>
+                    <span className="folder-item-count">{chats.length}</span>
+                  </div>
+
+                  {/* User Folders */}
+                  {folders.map(folder => (
+                    <div 
+                      key={folder.name}
+                      className={`folder-item ${selectedFolder === folder.name ? 'active' : ''}`}
+                      onClick={() => setSelectedFolder(folder.name)}
+                    >
+                      <div className="folder-item-left">
+                        <Folder size={14} style={{ color: folder.color }} />
+                        <span className="folder-item-name">{folder.name}</span>
+                      </div>
+                      <span className="folder-item-count">
+                        {chats.filter(c => (c as any).folder === folder.name).length}
+                      </span>
+                      <button
+                        className="folder-delete-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteFolder(folder.name)
+                        }}
+                        title="Delete folder"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Create Folder Form */}
+                {isCreatingFolder && (
+                  <div className="folder-create-form">
+                    <input
+                      type="text"
+                      className="folder-create-input"
+                      placeholder="Folder name..."
+                      value={newFolderName}
+                      onChange={(e) => setNewFolderName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !colorPickerOpen) handleCreateFolder()
+                        if (e.key === 'Escape') {
+                          if (colorPickerOpen) {
+                            setColorPickerOpen(false)
+                          } else {
+                            setIsCreatingFolder(false)
+                            setNewFolderName('')
+                            setNewFolderColor('#3b82f6')
+                          }
+                        }
+                      }}
+                      autoFocus
+                    />
+                    
+                    {/* Custom color picker dropdown */}
+                    <div className="folder-color-dropdown">
+                      <button
+                        className="folder-color-trigger"
+                        onClick={() => setColorPickerOpen(!colorPickerOpen)}
+                        type="button"
+                      >
+                        <div 
+                          className="folder-color-preview" 
+                          style={{ backgroundColor: newFolderColor }}
+                        />
+                        <span>Color</span>
+                        <ChevronDown size={14} className={colorPickerOpen ? 'rotated' : ''} />
+                      </button>
+                      
+                      {colorPickerOpen && (
+                        <div className="folder-color-menu">
+                          {folderColors.map(color => (
+                            <button
+                              key={color}
+                              className={`folder-color-item ${newFolderColor === color ? 'selected' : ''}`}
+                              onClick={() => {
+                                setNewFolderColor(color)
+                                setColorPickerOpen(false)
+                              }}
+                              type="button"
+                            >
+                              <div 
+                                className="folder-color-swatch" 
+                                style={{ backgroundColor: color }}
+                              />
+                              <span>{color}</span>
+                              {newFolderColor === color && <Check size={14} />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="folder-create-actions">
+                      <button
+                        className="folder-create-btn"
+                        onClick={handleCreateFolder}
+                        disabled={!newFolderName.trim()}
+                      >
+                        Create
+                      </button>
+                      <button
+                        className="folder-cancel-btn"
+                        onClick={() => {
+                          setIsCreatingFolder(false)
+                          setNewFolderName('')
+                          setNewFolderColor('#3b82f6')
+                          setColorPickerOpen(false)
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               )}
               
               <div className="chat-inner">
@@ -2098,6 +2468,43 @@ function App() {
               <span>Delete</span>
             </div>            
             <span className='context-shortcut'>{shortcuts.delete.toUpperCase()}</span>          
+          </div>
+
+          <div className="context-menu-divider"></div>
+          <div 
+            className="context-item"
+            onMouseEnter={() => setFolderSubmenuOpen(chatContextMenu.chatId)}
+            onMouseLeave={() => setFolderSubmenuOpen(null)}
+            style={{ position: 'relative' }}
+          >
+            <div className="context-left">
+              <Folder size={18} />
+              <span>Move to Folder</span>
+            </div>
+            <span className='context-shortcut'>▶</span>
+            
+            {/* Folder Submenu */}
+            {folderSubmenuOpen === chatContextMenu.chatId && (
+              <div className="folder-submenu">
+                <div 
+                  className="folder-submenu-item"
+                  onClick={() => handleMoveToFolder(chatContextMenu.chatId, null)}
+                >
+                  <X size={12} />
+                  No Folder
+                </div>
+                {folders.map(folder => (
+                  <div 
+                    key={folder.name}
+                    className="folder-submenu-item"
+                    onClick={() => handleMoveToFolder(chatContextMenu.chatId, folder.name)}
+                  >
+                    <Folder size={12} style={{ color: folder.color }} />
+                    {folder.name}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className='context-item'>
