@@ -121,6 +121,17 @@
 /* ============================================
    SEARCH MATCH HIGHLIGHTING
    ============================================ */
+mark.search-highlight {
+  background: rgba(251, 191, 36, 0.3);
+  color: inherit;
+  padding: 2px 0;
+  border-radius: 2px;
+}
+
+mark.search-highlight.current {
+  background: rgba(251, 191, 36, 0.6);
+  font-weight: 500;
+}
 
 .msg-content mark.search-match {
   background: rgba(251, 191, 36, 0.3);

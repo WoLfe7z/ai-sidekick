@@ -265,31 +265,50 @@ function App() {
             
             // Apply search highlighting if needed
             if (messageSearchQuery.trim()) {
-              // For search, we need to handle it differently
-              // Search highlighting takes precedence over markdown
-              const query = messageSearchQuery
-              const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-              const textParts = part.split(regex)
+              // Render markdown first, then apply highlighting to the result
+              const markdownElements = renderMarkdown(markdownTokens)
               
-              return (
-                <span key={i}>
-                  {textParts.map((textPart, j) => 
+              // Helper function to add highlighting to text nodes
+              const addHighlighting = (element: any): any => {
+                if (typeof element === 'string') {
+                  const query = messageSearchQuery
+                  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+                  const textParts = element.split(regex)
+                  
+                  return textParts.map((textPart, j) => 
                     regex.test(textPart) ? (
                       <mark 
                         key={j} 
-                        className={isCurrentMatch ? 'search-match current-match' : 'search-match'}
+                        className={isCurrentMatch ? 'search-highlight current' : 'search-highlight'}
                       >
                         {textPart}
                       </mark>
                     ) : (
                       textPart
                     )
-                  )}
-                </span>
-              )
+                  )
+                }
+                
+                // If it's a React element, recursively process its children
+                if (element && element.props && element.props.children) {
+                  return {
+                    ...element,
+                    props: {
+                      ...element.props,
+                      children: Array.isArray(element.props.children)
+                        ? element.props.children.map(addHighlighting)
+                        : addHighlighting(element.props.children)
+                    }
+                  }
+                }
+                
+                return element
+              }
+              
+              return <div key={i}>{addHighlighting(markdownElements)}</div>
             }
             
-            // Render markdown
+            // Render markdown without search highlighting
             return <div key={i}>{renderMarkdown(markdownTokens)}</div>
           } else {
             // Code block
@@ -1523,15 +1542,6 @@ function App() {
 
           {sortDropdownOpen && (
             <div className="sort-dropdown">
-              <div 
-                className={`sort-option ${sortBy === 'folder' ? 'active' : ''}`}
-                onClick={() => {
-                  setSortBy('folder')
-                  setSortDropdownOpen(false)
-                }}
-              >
-                By Folder
-              </div>
               <div 
                 className={`sort-option ${sortBy === 'latest' ? 'active' : ''}`}
                 onClick={() => {
