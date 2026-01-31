@@ -553,17 +553,23 @@ ipcMain.handle("ai:explain", async (_event, text) => {
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "You are an expert AI assistant that explains code and errors clearly and concisely." },
+        {
+          role: "system",
+          content: "You are a helpful AI assistant. Use markdown formatting: **bold** for emphasis, `code` for snippets, - lists for organization, code blocks for code, ## headings for structure. Be clear and concise."
+        },
         { role: "user", content: text }
       ],
-      temperature: 0.3
+      temperature: 0.7
     });
     return response.choices[0].message.content ?? "No explanation provided.";
   } catch (err) {
     if ((err == null ? void 0 : err.code) === "insufficient_quota") {
-      return "⚠️ OpenAI API quota exceeded. Please check your billing settings.";
+      return "⚠️ **OpenAI API quota exceeded.**\nPlease check your billing settings at the [OpenAI Dashboard](https://platform.openai.com/account/billing).";
     }
-    return "⚠️ AI service error. Please try again later.";
+    if ((err == null ? void 0 : err.code) === "ENOTFOUND" || (err == null ? void 0 : err.code) === "ECONNREFUSED") {
+      return "⚠️ **Network error.**\nCannot connect to OpenAI services. Please check your internet connection.";
+    }
+    return "⚠️ **AI service error.**\nPlease try again later.\n*Error details: " + ((err == null ? void 0 : err.message) || "Unknown error") + "*";
   }
 });
 ipcMain.handle("db:initialize", async () => {

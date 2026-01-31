@@ -9,12 +9,14 @@ import './styles/message-search.css'
 import './styles/analytics.css'
 import './styles/file-upload.css'
 import './styles/code-highlight.css'
+import './styles/markdown.css'
 
 // Chat history
 import { Chat, Message } from './types/chat'
 import { createNewChat, addMessageToChat } from './state/chatStore'
 import { FileUploader, FilePreview, UploadedFile } from './components/fileUploader'
 import { CodeBlock, parseMessageWithCode } from './components/codeBlock'
+import { parseMarkdown, renderMarkdown } from './components/markdownRenderer'
 
 // Declare window.ai for TypeScript
 declare global {
@@ -225,29 +227,37 @@ function App() {
       <>
         {parts.map((part, i) => {
           if (typeof part === 'string') {
-            // Regular text - apply search highlighting if needed
-            if (!messageSearchQuery.trim()) return <span key={i}>{part}</span>
+            // Parse markdown in text parts
+            const markdownTokens = parseMarkdown(part)
             
-            const query = messageSearchQuery
-            const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-            const textParts = part.split(regex)
+            // Apply search highlighting if needed
+            if (messageSearchQuery.trim()) {
+              // For search, we need to handle it differently
+              // Search highlighting takes precedence over markdown
+              const query = messageSearchQuery
+              const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+              const textParts = part.split(regex)
+              
+              return (
+                <span key={i}>
+                  {textParts.map((textPart, j) => 
+                    regex.test(textPart) ? (
+                      <mark 
+                        key={j} 
+                        className={isCurrentMatch ? 'search-match current-match' : 'search-match'}
+                      >
+                        {textPart}
+                      </mark>
+                    ) : (
+                      textPart
+                    )
+                  )}
+                </span>
+              )
+            }
             
-            return (
-              <span key={i}>
-                {textParts.map((textPart, j) => 
-                  regex.test(textPart) ? (
-                    <mark 
-                      key={j} 
-                      className={isCurrentMatch ? 'search-match current-match' : 'search-match'}
-                    >
-                      {textPart}
-                    </mark>
-                  ) : (
-                    textPart
-                  )
-                )}
-              </span>
-            )
+            // Render markdown
+            return <div key={i}>{renderMarkdown(markdownTokens)}</div>
           } else {
             // Code block
             return (
