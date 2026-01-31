@@ -7,10 +7,12 @@ import './styles/context-menu.css'
 import './styles/shortcut.css'
 import './styles/message-search.css'
 import './styles/analytics.css'
+import './styles/file-upload.css'
 
 // Chat history
 import { Chat, Message } from './types/chat'
 import { createNewChat, addMessageToChat } from './state/chatStore'
+import { FileUploader, FilePreview, UploadedFile } from './components/fileUploader'
 
 // Declare window.ai for TypeScript
 declare global {
@@ -200,10 +202,10 @@ function App() {
   const [editingMessageContent, setEditingMessageContent] = useState('')
 
   // Message branching state
-  // Structure: { messageIndex: { branches: Message[][], currentBranch: number } }
+  // Structure: { "chatId:messageIndex": { branches: Message[][], currentBranch: number } }
   const [messageBranches, setMessageBranches] = useState<{
-    [messageIndex: number]: {
-      branches: Message[][]  // Each branch is an array of messages from that point forward
+    [key: string]: {  // key format: "chatId:messageIndex"
+      branches: Message[][]
       currentBranch: number
     }
   }>({})
@@ -410,15 +412,17 @@ function App() {
     const chat = chats.find(c => c.id === activeChatId)
     if (!chat) return
 
+    const branchKey = `${activeChatId}:${messageIndex}`
+
     // Get messages up to and including the branch point
     const baseMessages = chat.messages.slice(0, messageIndex + 1)
     const remainingMessages = chat.messages.slice(messageIndex + 1)
 
     // Initialize branch structure if it doesn't exist
-    if (!messageBranches[messageIndex]) {
+    if (!messageBranches[branchKey]) {
       setMessageBranches(prev => ({
         ...prev,
-        [messageIndex]: {
+        [branchKey]: {
           branches: [remainingMessages], // Original path as first branch
           currentBranch: 0
         }
@@ -428,9 +432,9 @@ function App() {
     // Add new empty branch
     setMessageBranches(prev => ({
       ...prev,
-      [messageIndex]: {
-        branches: [...(prev[messageIndex]?.branches || [remainingMessages]), []],
-        currentBranch: (prev[messageIndex]?.branches.length || 1)
+      [branchKey]: {
+        branches: [...(prev[branchKey]?.branches || [remainingMessages]), []],
+        currentBranch: (prev[branchKey]?.branches.length || 1)
       }
     }))
 
@@ -453,7 +457,8 @@ function App() {
     const chat = chats.find(c => c.id === activeChatId)
     if (!chat) return
 
-    const branchData = messageBranches[messageIndex]
+    const branchKey = `${activeChatId}:${messageIndex}`
+    const branchData = messageBranches[branchKey]
     if (!branchData) return
 
     // Before switching, save the current branch's messages
@@ -462,10 +467,10 @@ function App() {
     
     setMessageBranches(prev => ({
       ...prev,
-      [messageIndex]: {
-        ...prev[messageIndex],
-        branches: prev[messageIndex].branches.map((branch, i) => 
-          i === prev[messageIndex].currentBranch ? currentBranchMessages : branch
+      [branchKey]: {
+        ...prev[branchKey],
+        branches: prev[branchKey].branches.map((branch, i) => 
+          i === prev[branchKey].currentBranch ? currentBranchMessages : branch
         )
       }
     }))
@@ -490,7 +495,7 @@ function App() {
 
     setMessageBranches(prev => ({
       ...prev,
-      [messageIndex]: updatedBranchData
+      [branchKey]: updatedBranchData
     }))
 
     // Update chat messages to show the selected branch
@@ -509,7 +514,10 @@ function App() {
 
   // Get branch info for a message
   const getBranchInfo = (messageIndex: number) => {
-    const branchData = messageBranches[messageIndex]
+    if (!activeChatId) return null
+    
+    const branchKey = `${activeChatId}:${messageIndex}`
+    const branchData = messageBranches[branchKey]
     if (!branchData || branchData.branches.length <= 1) return null
 
     return {
@@ -578,6 +586,7 @@ function App() {
   const [isTyping, setIsTyping] = useState(false)
   const [userIsTyping, setUserIsTyping] = useState(false)
   const [messageInput, setMessageInput] = useState('')
+  const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([])
   const isExplainingRef = useRef(false)
   const activeChatIdRef = useRef<string | null>(null)
 
@@ -712,23 +721,30 @@ function App() {
 
         // If branches exist, reconstruct messages to show the current branch
         if (Object.keys(branches).length > 0) {
-          // Find the earliest branch point
-          const branchIndices = Object.keys(branches).map(k => parseInt(k)).sort((a, b) => a - b)
-          const earliestBranch = branchIndices[0]
-          const branchData = branches[earliestBranch]
+          // Find the earliest branch point for this chat
+          const chatBranchKeys = Object.keys(branches).filter(key => key.startsWith(`${activeChatId}:`))
           
-          if (branchData && branchData.branches && branchData.branches.length > 0) {
-            // Get base messages up to branch point
-            const baseMessages = chat.messages.slice(0, earliestBranch + 1)
-            // Get current branch messages
-            const currentBranchMessages = branchData.branches[branchData.currentBranch] || []
+          if (chatBranchKeys.length > 0) {
+            const branchIndices = chatBranchKeys.map(key => parseInt(key.split(':')[1])).sort((a, b) => a - b)
+            const earliestBranchIndex = branchIndices[0]
+            const earliestBranchKey = `${activeChatId}:${earliestBranchIndex}`
+            const branchData = branches[earliestBranchKey]
             
-            // Update chat with reconstructed messages
-            const reconstructedChat = {
-              ...chat,
-              messages: [...baseMessages, ...currentBranchMessages]
+            if (branchData && branchData.branches && branchData.branches.length > 0) {
+              // Get base messages up to branch point
+              const baseMessages = chat.messages.slice(0, earliestBranchIndex + 1)
+              // Get current branch messages
+              const currentBranchMessages = branchData.branches[branchData.currentBranch] || []
+              
+              // Update chat with reconstructed messages
+              const reconstructedChat = {
+                ...chat,
+                messages: [...baseMessages, ...currentBranchMessages]
+              }
+              setChats(prev => prev.map(c => c.id === activeChatId ? reconstructedChat : c))
+            } else {
+              setChats(prev => prev.map(c => c.id === activeChatId ? chat : c))
             }
-            setChats(prev => prev.map(c => c.id === activeChatId ? reconstructedChat : c))
           } else {
             setChats(prev => prev.map(c => c.id === activeChatId ? chat : c))
           }
@@ -874,25 +890,28 @@ function App() {
     const chat = chats.find(c => c.id === chatId)
     if (!chat) return
 
-    // Find if we're at a branch point
-    for (const [indexStr, branchData] of Object.entries(messageBranches)) {
-      const index = parseInt(indexStr)
-      const baseMessages = chat.messages.slice(0, index + 1)
+    // Find if we're at a branch point (only check branches for this chat)
+    for (const [branchKey, branchData] of Object.entries(messageBranches)) {
+      // Skip branches from other chats
+      if (!branchKey.startsWith(`${chatId}:`)) continue
+      
+      const messageIndex = parseInt(branchKey.split(':')[1])
+      const baseMessages = chat.messages.slice(0, messageIndex + 1)
       
       // If our current messages start with this base, we're in this branch
       if (chat.messages.length > baseMessages.length &&
           chat.messages.slice(0, baseMessages.length).every((msg, i) => msg.id === baseMessages[i]?.id)) {
         
         // Get messages after the branch point
-        const branchMessages = chat.messages.slice(index + 1)
+        const branchMessages = chat.messages.slice(messageIndex + 1)
         
         // Update the current branch with new messages
         setMessageBranches(prev => ({
           ...prev,
-          [index]: {
-            ...prev[index],
-            branches: prev[index].branches.map((branch, i) => 
-              i === prev[index].currentBranch ? branchMessages : branch
+          [branchKey]: {
+            ...prev[branchKey],
+            branches: prev[branchKey].branches.map((branch, i) => 
+              i === prev[branchKey].currentBranch ? branchMessages : branch
             )
           }
         }))
@@ -902,10 +921,32 @@ function App() {
   }
 
   const handleSendMessage = async () => {
-    if (!messageInput.trim() || isTyping) return
+    if ((!messageInput.trim() && attachedFiles.length === 0) || isTyping) return
     
-    const message = messageInput.trim()
+    let message = messageInput.trim()
+    
+    // Add file context to message
+    if (attachedFiles.length > 0) {
+      message += '\n\n[Attached Files]:\n'
+      
+      for (const file of attachedFiles) {
+        message += `\n--- ${file.name} ---\n`
+        
+        if (file.type.startsWith('image/')) {
+          message += `[Image: ${file.name}]\n`
+          // Note: For full multimodal support, you'd send the base64 image to a vision model
+          // For now, we just mention it
+        } else if (file.data && !file.data.startsWith('data:')) {
+          // Text file content
+          message += file.data + '\n'
+        } else {
+          message += `[File: ${file.name}, ${(file.size / 1024).toFixed(1)}KB]\n`
+        }
+      }
+    }
+    
     setMessageInput('')
+    setAttachedFiles([])
     setUserIsTyping(false)
     
     await handleExplain(message)
@@ -1800,12 +1841,25 @@ function App() {
         {/* Message Input */}
         {rightPanel === 'panel-chat' && activeChatId && (
           <div className="message-input-container">
+            <FileUploader 
+              onFilesSelected={(files) => setAttachedFiles(prev => [...prev, ...files])}
+              maxFiles={5}
+              maxSizeMB={10}
+            />
             <div className="message-input-wrapper">
+              <FilePreview 
+                files={attachedFiles}
+                onRemove={(id) => setAttachedFiles(prev => prev.filter(f => f.id !== id))}
+              />
               <div className="message-input-box">
-                <button className="attachment-button" title="Add attachment">
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Paperclip size={20} />
-                    </span>
+                <button 
+                  className="attachment-button" 
+                  title="Add attachment"
+                  onClick={() => document.getElementById('file-upload')?.click()}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Paperclip size={20} />
+                  </span>
                 </button>
                 <textarea
                   className="message-input"
