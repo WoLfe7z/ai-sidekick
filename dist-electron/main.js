@@ -353,6 +353,7 @@ function initializeDatabase() {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       favorite INTEGER DEFAULT 0,
+      folder TEXT,
       createdAt INTEGER NOT NULL,
       updatedAt INTEGER NOT NULL
     );
@@ -389,13 +390,14 @@ function getDatabase() {
 function saveChat(chat) {
   const database = getDatabase();
   const stmt = database.prepare(`
-    INSERT OR REPLACE INTO chats (id, title, favorite, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO chats (id, title, favorite, folder, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
   stmt.run(
     chat.id,
     chat.title,
     chat.favorite ? 1 : 0,
+    chat.folder || null,
     chat.createdAt,
     Date.now()
   );
@@ -424,6 +426,10 @@ function updateChat(chatId, updates) {
     fields.push("favorite = ?");
     values.push(updates.favorite ? 1 : 0);
   }
+  if ("folder" in updates) {
+    fields.push("folder = ?");
+    values.push(updates.folder || null);
+  }
   fields.push("updatedAt = ?");
   values.push(Date.now());
   values.push(chatId);
@@ -440,7 +446,7 @@ function deleteChat(chatId) {
 function loadChats() {
   const database = getDatabase();
   const chats = database.prepare(`
-    SELECT id, title, favorite, createdAt, updatedAt
+    SELECT id, title, favorite, folder, createdAt, updatedAt
     FROM chats
     ORDER BY createdAt DESC
   `).all();
@@ -448,6 +454,7 @@ function loadChats() {
     id: chat.id,
     title: chat.title,
     favorite: chat.favorite === 1,
+    folder: chat.folder,
     createdAt: chat.createdAt,
     updatedAt: chat.updatedAt,
     messages: [],
@@ -457,7 +464,7 @@ function loadChats() {
 function loadChat(chatId) {
   const database = getDatabase();
   const chat = database.prepare(`
-    SELECT id, title, favorite, createdAt, updatedAt
+    SELECT id, title, favorite, folder, createdAt, updatedAt
     FROM chats
     WHERE id = ?
   `).get(chatId);
@@ -467,6 +474,7 @@ function loadChat(chatId) {
     id: chat.id,
     title: chat.title,
     favorite: chat.favorite === 1,
+    folder: chat.folder,
     createdAt: chat.createdAt,
     updatedAt: chat.updatedAt,
     messages,
@@ -553,17 +561,23 @@ ipcMain.handle("ai:explain", async (_event, text) => {
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "You are an expert AI assistant that explains code and errors clearly and concisely." },
+        {
+          role: "system",
+          content: "You are a helpful AI assistant. Use markdown formatting: **bold** for emphasis, `code` for snippets, - lists for organization, code blocks for code, ## headings for structure. Be clear and concise."
+        },
         { role: "user", content: text }
       ],
-      temperature: 0.3
+      temperature: 0.7
     });
     return response.choices[0].message.content ?? "No explanation provided.";
   } catch (err) {
     if ((err == null ? void 0 : err.code) === "insufficient_quota") {
-      return "⚠️ OpenAI API quota exceeded. Please check your billing settings.";
+      return "⚠️ **OpenAI API quota exceeded.**\nPlease check your billing settings at the [OpenAI Dashboard](https://platform.openai.com/account/billing).";
     }
-    return "⚠️ AI service error. Please try again later.";
+    if ((err == null ? void 0 : err.code) === "ENOTFOUND" || (err == null ? void 0 : err.code) === "ECONNREFUSED") {
+      return "⚠️ **Network error.**\nCannot connect to OpenAI services. Please check your internet connection.";
+    }
+    return "⚠️ **AI service error.**\nPlease try again later.\n*Error details: " + ((err == null ? void 0 : err.message) || "Unknown error") + "*";
   }
 });
 ipcMain.handle("db:initialize", async () => {

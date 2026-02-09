@@ -23,6 +23,7 @@ export function initializeDatabase() {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       favorite INTEGER DEFAULT 0,
+      folder TEXT,
       createdAt INTEGER NOT NULL,
       updatedAt INTEGER NOT NULL
     );
@@ -66,14 +67,15 @@ export function saveChat(chat: Chat) {
   const database = getDatabase()
   
   const stmt = database.prepare(`
-    INSERT OR REPLACE INTO chats (id, title, favorite, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO chats (id, title, favorite, folder, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?, ?)
   `)
   
   stmt.run(
     chat.id,
     chat.title,
     chat.favorite ? 1 : 0,
+    (chat as any).folder || null,
     chat.createdAt,
     Date.now()
   )
@@ -110,6 +112,11 @@ export function updateChat(chatId: string, updates: Partial<Chat>) {
     fields.push('favorite = ?')
     values.push(updates.favorite ? 1 : 0)
   }
+
+  if ('folder' in updates) {
+    fields.push('folder = ?')
+    values.push((updates as any).folder || null)  // Convert undefined to null
+  }
   
   fields.push('updatedAt = ?')
   values.push(Date.now())
@@ -135,7 +142,7 @@ export function loadChats(): Chat[] {
   const database = getDatabase()
   
   const chats = database.prepare(`
-    SELECT id, title, favorite, createdAt, updatedAt
+    SELECT id, title, favorite, folder, createdAt, updatedAt
     FROM chats
     ORDER BY createdAt DESC
   `).all() as any[]
@@ -144,6 +151,7 @@ export function loadChats(): Chat[] {
     id: chat.id,
     title: chat.title,
     favorite: chat.favorite === 1,
+    folder: chat.folder,
     createdAt: chat.createdAt,
     updatedAt: chat.updatedAt,
     messages: [],
@@ -155,7 +163,7 @@ export function loadChat(chatId: string): Chat | null {
   const database = getDatabase()
   
   const chat = database.prepare(`
-    SELECT id, title, favorite, createdAt, updatedAt
+    SELECT id, title, favorite, folder, createdAt, updatedAt
     FROM chats
     WHERE id = ?
   `).get(chatId) as any
@@ -168,6 +176,7 @@ export function loadChat(chatId: string): Chat | null {
     id: chat.id,
     title: chat.title,
     favorite: chat.favorite === 1,
+    folder: chat.folder,
     createdAt: chat.createdAt,
     updatedAt: chat.updatedAt,
     messages,

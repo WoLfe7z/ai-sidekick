@@ -1,0 +1,147 @@
+/* ============================================
+   MARKDOWN RENDERING
+   ============================================ */
+
+/* Inline markdown */
+.markdown-inline-code {
+  background: rgba(96, 165, 250, 0.1);
+  color: #93c5fd;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9em;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+.markdown-link {
+  color: #60a5fa;
+  text-decoration: underline;
+  text-decoration-color: rgba(96, 165, 250, 0.4);
+  transition: all 0.15s ease;
+}
+
+.markdown-link:hover {
+  color: #93c5fd;
+  text-decoration-color: #93c5fd;
+}
+
+/* Block elements */
+.markdown-text {
+  margin: 0 0 8px 0;
+  line-height: 1.6;
+}
+
+.markdown-text:last-child {
+  margin-bottom: 0;
+}
+
+/* Headings */
+.markdown-h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 16px 0 12px 0;
+  color: #e5e7eb;
+  border-bottom: 2px solid #2a2a2a;
+  padding-bottom: 8px;
+}
+
+.markdown-h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 14px 0 10px 0;
+  color: #e5e7eb;
+  border-bottom: 1px solid #2a2a2a;
+  padding-bottom: 6px;
+}
+
+.markdown-h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 12px 0 8px 0;
+  color: #e5e7eb;
+}
+
+.markdown-h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 10px 0 6px 0;
+  color: #d1d5db;
+}
+
+.markdown-h5 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 8px 0 4px 0;
+  color: #d1d5db;
+}
+
+.markdown-h6 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 8px 0 4px 0;
+  color: #9ca3af;
+}
+
+/* Lists */
+.markdown-list {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.markdown-list-item {
+  margin: 4px 0;
+  line-height: 1.6;
+}
+
+.markdown-list ul,
+.markdown-list ol {
+  margin: 4px 0;
+}
+
+/* Blockquote */
+.markdown-blockquote {
+  margin: 12px 0;
+  padding: 8px 16px;
+  border-left: 4px solid #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+  color: #d1d5db;
+  font-style: italic;
+}
+
+/* Horizontal rule */
+.markdown-hr {
+  margin: 16px 0;
+  border: none;
+  border-top: 1px solid #2a2a2a;
+}
+
+/* Text formatting */
+strong {
+  font-weight: 700;
+  color: #e5e7eb;
+}
+
+em {
+  font-style: italic;
+  color: #d1d5db;
+}
+
+del {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Message content adjustments */
+.msg-content .markdown-text:first-child {
+  margin-top: 0;
+}
+
+.msg-content .markdown-text:last-child {
+  margin-bottom: 0;
+}
+
+.msg-content .markdown-h1:first-child,
+.msg-content .markdown-h2:first-child,
+.msg-content .markdown-h3:first-child {
+  margin-top: 0;
+}

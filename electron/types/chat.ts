@@ -8,9 +8,10 @@ export type Message = {
 export type Chat = {
   id: string
   title: string
+  favorite?: boolean
+  folder?: string
   messages: Message[]
   createdAt: number
   updatedAt: number
-  favorite?: boolean
   isDeleting?: boolean
 }

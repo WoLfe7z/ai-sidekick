@@ -121,6 +121,17 @@
 /* ============================================
    SEARCH MATCH HIGHLIGHTING
    ============================================ */
+mark.search-highlight {
+  background: rgba(251, 191, 36, 0.3);
+  color: inherit;
+  padding: 2px 0;
+  border-radius: 2px;
+}
+
+mark.search-highlight.current {
+  background: rgba(251, 191, 36, 0.6);
+  font-weight: 500;
+}
 
 .msg-content mark.search-match {
   background: rgba(251, 191, 36, 0.3);
@@ -367,4 +378,19 @@
 .msg-action-btn:has(.lucide-chevron-right):hover:not(:disabled) {
   color: #e5e7eb;
   background: #374151;
+}
+
+/* Branch delete button */
+.branch-delete-btn {
+  color: #ef4444;
+}
+
+.branch-delete-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.branch-delete-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
