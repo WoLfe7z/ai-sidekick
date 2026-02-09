@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, ChevronDown, Edit2, Check, GitBranch, ChevronLeft, ChevronRight, BarChart3, Folder, Tag, Plus, ArrowDown, MessageSquare, Keyboard, Zap } from 'lucide-react' 
+import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, 
+  ChevronDown, Edit2, Check, GitBranch, ChevronLeft, ChevronRight, BarChart3, Folder, Tag, Plus, ArrowDown, MessageSquare, 
+  Keyboard, Zap, Download, FileText, FileJson, File } from 'lucide-react' 
 import './styles/base.css'
 import './styles/sidebar.css'
 import './styles/chat.css'
@@ -11,6 +13,7 @@ import './styles/file-upload.css'
 import './styles/code-highlight.css'
 import './styles/markdown.css'
 import './styles/folders.css'
+import './styles/exportModal.css'
 
 // Chat history
 import { Chat, Message } from './types/chat'
@@ -18,7 +21,7 @@ import { createNewChat, addMessageToChat } from './state/chatStore'
 import { FileUploader, FilePreview, UploadedFile } from './components/fileUploader'
 import { CodeBlock, parseMessageWithCode } from './components/codeBlock'
 import { parseMarkdown, renderMarkdown } from './components/markdownRenderer'
-
+import { exportChatAsMarkdown, exportChatAsJSON, exportChatAsText, downloadFile, generateFilename } from './utils/Chatexport'
 
 // Timestamp formatting
 function formatTimestamp(timestamp: number): string {
@@ -273,6 +276,11 @@ function App() {
   // Message editing state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editingMessageContent, setEditingMessageContent] = useState('')
+
+  //Export chat modal
+  const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [exportFormat, setExportFormat] = useState<'markdown' | 'json' | 'text'>('markdown')
+  const [exportingChatId, setExportingChatId] = useState<string | null>(null)
 
   // Message branching state
   // Structure: { "chatId:messageIndex": { branches: Message[][], currentBranch: number } }
@@ -930,6 +938,40 @@ function App() {
     const { scrollTop, scrollHeight, clientHeight } = chatInnerRef.current
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight
     setShowScrollButton(distanceFromBottom > 200)
+  }
+
+  // Export chat handler
+  const handleExportChat = (chatId: string) => {
+    const chat = chats.find(c => c.id === chatId)
+    if (!chat) return
+
+    let content: string
+    let mimeType: string
+    let extension: string
+
+    switch (exportFormat) {
+      case 'markdown':
+        content = exportChatAsMarkdown(chat)
+        mimeType = 'text/markdown'
+        extension = 'md'
+        break
+      case 'json':
+        content = exportChatAsJSON(chat)
+        mimeType = 'application/json'
+        extension = 'json'
+        break
+      case 'text':
+        content = exportChatAsText(chat)
+        mimeType = 'text/plain'
+        extension = 'txt'
+        break
+    }
+
+    const filename = generateFilename(chat.title, extension)
+    downloadFile(content, filename, mimeType)
+    
+    setExportModalOpen(false)
+    setExportingChatId(null)
   }
 
   // Chat context menu states
@@ -2667,6 +2709,20 @@ function App() {
             <div 
               className="context-left"
               onClick={() => {
+                setExportingChatId(chatContextMenu.chatId)
+                setExportModalOpen(true)
+                setChatContextMenu(null)
+              }}
+            >
+              <Download size={18} />
+              <span>Export Chat</span>
+            </div>
+          </div>
+
+          <div className='context-item'>
+            <div 
+              className="context-left"
+              onClick={() => {
                 setActiveChatId(null)
                 setChatContextMenu(null)
               }}
@@ -2702,6 +2758,119 @@ function App() {
           >
             Undo
           </button>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {exportModalOpen && exportingChatId && (
+        <div className="export-modal-overlay" onClick={() => setExportModalOpen(false)}>
+          <div className="export-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="export-modal-header">
+              <h3 className="export-modal-title">Export Chat</h3>
+              <button 
+                className="export-modal-close"
+                onClick={() => setExportModalOpen(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="export-modal-body">
+              {(() => {
+                const chat = chats.find(c => c.id === exportingChatId)
+                if (!chat) return null
+
+                return (
+                  <>
+                    <div className="export-info">
+                      <div className="export-info-row">
+                        <span className="export-info-label">Chat:</span>
+                        <span className="export-info-value">{chat.title}</span>
+                      </div>
+                      <div className="export-info-row">
+                        <span className="export-info-label">Messages:</span>
+                        <span className="export-info-value">{chat.messages.length}</span>
+                      </div>
+                      <div className="export-info-row">
+                        <span className="export-info-label">Created:</span>
+                        <span className="export-info-value">
+                          {new Date(chat.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <label className="export-format-label">Choose Export Format:</label>
+                    
+                    <div className="export-format-options">
+                      <div 
+                        className={`export-format-option ${exportFormat === 'markdown' ? 'selected' : ''}`}
+                        onClick={() => setExportFormat('markdown')}
+                      >
+                        <div className="export-format-radio"></div>
+                        <div className="export-format-details">
+                          <div className="export-format-name">
+                            <FileText size={16} style={{ display: 'inline', marginRight: '6px' }} />
+                            Markdown (.md)
+                          </div>
+                          <div className="export-format-description">
+                            Formatted text with headers and styling. Best for reading and sharing.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div 
+                        className={`export-format-option ${exportFormat === 'json' ? 'selected' : ''}`}
+                        onClick={() => setExportFormat('json')}
+                      >
+                        <div className="export-format-radio"></div>
+                        <div className="export-format-details">
+                          <div className="export-format-name">
+                            <FileJson size={16} style={{ display: 'inline', marginRight: '6px' }} />
+                            JSON (.json)
+                          </div>
+                          <div className="export-format-description">
+                            Structured data format. Best for backup and importing to other apps.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div 
+                        className={`export-format-option ${exportFormat === 'text' ? 'selected' : ''}`}
+                        onClick={() => setExportFormat('text')}
+                      >
+                        <div className="export-format-radio"></div>
+                        <div className="export-format-details">
+                          <div className="export-format-name">
+                            <File size={16} style={{ display: 'inline', marginRight: '6px' }} />
+                            Plain Text (.txt)
+                          </div>
+                          <div className="export-format-description">
+                            Simple unformatted text. Works anywhere, no special formatting.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+
+            <div className="export-modal-footer">
+              <button 
+                className="export-btn export-btn-cancel"
+                onClick={() => setExportModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="export-btn export-btn-primary"
+                onClick={() => handleExportChat(exportingChatId)}
+              >
+                <Download size={16} />
+                Export
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

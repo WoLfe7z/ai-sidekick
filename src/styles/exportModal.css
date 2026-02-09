@@ -1,0 +1,253 @@
+/* ============================================
+   EXPORT MODAL
+   ============================================ */
+
+.export-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease;
+}
+
+.export-modal {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.export-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.export-modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #e5e7eb;
+  margin: 0;
+}
+
+.export-modal-close {
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.export-modal-close:hover {
+  background: #2a2a2a;
+  color: #e5e7eb;
+}
+
+.export-modal-body {
+  margin-bottom: 24px;
+}
+
+.export-info {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 20px;
+}
+
+.export-info-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.export-info-row:last-child {
+  margin-bottom: 0;
+}
+
+.export-info-label {
+  color: #9ca3af;
+}
+
+.export-info-value {
+  color: #e5e7eb;
+  font-weight: 500;
+}
+
+.export-format-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #9ca3af;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.export-format-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.export-format-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: #0a0a0a;
+  border: 2px solid #2a2a2a;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.export-format-option:hover {
+  border-color: #3a3a3a;
+  background: #141414;
+}
+
+.export-format-option.selected {
+  border-color: #1e40af;
+  background: rgba(30, 64, 175, 0.1);
+}
+
+.export-format-radio {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #4b5563;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 2px;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.export-format-option.selected .export-format-radio {
+  border-color: #1e40af;
+}
+
+.export-format-option.selected .export-format-radio::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  background: #1e40af;
+  border-radius: 50%;
+}
+
+.export-format-details {
+  flex: 1;
+}
+
+.export-format-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e5e7eb;
+  margin-bottom: 4px;
+}
+
+.export-format-description {
+  font-size: 0.8rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.export-modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.export-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.export-btn-cancel {
+  background: transparent;
+  color: #9ca3af;
+  border: 1px solid #374151;
+}
+
+.export-btn-cancel:hover {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-color: #4b5563;
+}
+
+.export-btn-primary {
+  background: #1e40af;
+  color: #e0e7ff;
+  border: 1px solid #2563eb;
+}
+
+.export-btn-primary:hover {
+  background: #1e3a8a;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.export-btn-primary:active {
+  transform: scale(0.98);
+}
+
+/* Success animation */
+@keyframes checkmark {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.export-success-icon {
+  animation: checkmark 0.3s ease;
+}
