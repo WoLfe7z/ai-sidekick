@@ -394,3 +394,218 @@ mark.search-highlight.current {
   opacity: 0.3;
   cursor: not-allowed;
 }
+
+/* ============================================
+   MESSAGE TIMESTAMPS
+   ============================================ */
+
+.msg-timestamp {
+  font-size: 0.7rem;
+  color: #6b7280;
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  user-select: none;
+}
+
+/* User message timestamp - lighter for contrast on blue background */
+.msg-row.user .msg-timestamp {
+  color: #bfdbfe;
+}
+
+/* AI message timestamp - keep gray */
+.msg-row.assistant .msg-timestamp {
+  color: #6b7280;
+}
+
+.msg-bubble:hover .msg-timestamp {
+  opacity: 1;
+}
+
+/* ============================================
+   SCROLL TO BOTTOM BUTTON
+   ============================================ */
+
+.scroll-to-bottom-btn {
+  position: fixed;
+  bottom: 140px;
+  right: 40px;
+  width: 48px;
+  height: 48px;
+  background: #1e40af;
+  border: 1px solid #2563eb;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.4);
+  transition: all 0.2s ease;
+  z-index: 50;
+  animation: slideUp 0.3s ease;
+}
+
+.scroll-to-bottom-btn:hover {
+  background: #1e3a8a;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(30, 64, 175, 0.5);
+}
+
+.scroll-to-bottom-btn:active {
+  transform: translateY(0);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.unread-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+  border: 2px solid #0a0a0a;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}
+
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.empty-state-icon {
+  color: #374151;
+  margin-bottom: 24px;
+  opacity: 0.6;
+}
+
+.empty-state-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #e5e7eb;
+  margin: 0 0 12px 0;
+}
+
+.empty-state-description {
+  font-size: 1rem;
+  color: #9ca3af;
+  margin: 0 0 32px 0;
+  line-height: 1.5;
+}
+
+.empty-state-prompts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  width: 100%;
+  max-width: 500px;
+  margin-bottom: 40px;
+}
+
+.empty-state-prompt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  color: #e5e7eb;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.empty-state-prompt:hover {
+  background: #222;
+  border-color: #3a3a3a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.empty-state-prompt svg {
+  color: #60a5fa;
+  flex-shrink: 0;
+}
+
+.empty-state-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  background: rgba(30, 64, 175, 0.05);
+  border: 1px solid rgba(30, 64, 175, 0.1);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.shortcut-hint {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.shortcut-hint svg {
+  color: #60a5fa;
+  flex-shrink: 0;
+}
+
+.shortcut-hint kbd {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-family: 'Consolas', 'Monaco', monospace;
+  color: #e5e7eb;
+  box-shadow: 0 2px 0 #0a0a0a;
+  min-width: 28px;
+  text-align: center;
+}
+
+.shortcut-label {
+  color: #6b7280;
+  margin-left: auto;
+}
+
+/* Responsive for smaller screens */
+@media (max-width: 600px) {
+  .empty-state-prompts {
+    grid-template-columns: 1fr;
+  }
+  
+  .scroll-to-bottom-btn {
+    right: 20px;
+    bottom: 120px;
+  }
+}

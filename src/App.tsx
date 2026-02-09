@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, ChevronDown, Edit2, Check, GitBranch, ChevronLeft, ChevronRight, BarChart3, Folder, Tag, Plus, Filter } from 'lucide-react' 
+import { Star, Pencil, Trash2, X, Command, Paperclip, Send, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, ChevronUp, ChevronDown, Edit2, Check, GitBranch, ChevronLeft, ChevronRight, BarChart3, Folder, Tag, Plus, ArrowDown, MessageSquare, Keyboard, Zap } from 'lucide-react' 
 import './styles/base.css'
 import './styles/sidebar.css'
 import './styles/chat.css'
@@ -18,6 +18,37 @@ import { createNewChat, addMessageToChat } from './state/chatStore'
 import { FileUploader, FilePreview, UploadedFile } from './components/fileUploader'
 import { CodeBlock, parseMessageWithCode } from './components/codeBlock'
 import { parseMarkdown, renderMarkdown } from './components/markdownRenderer'
+
+
+// Timestamp formatting
+function formatTimestamp(timestamp: number): string {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  
+  const timeStr = date.toLocaleTimeString('en-US', { 
+    hour: 'numeric', 
+    minute: '2-digit',
+    hour12: true 
+  })
+  
+  if (messageDate.getTime() === today.getTime()) return timeStr
+  if (messageDate.getTime() === yesterday.getTime()) return `Yesterday ${timeStr}`
+  
+  const daysAgo = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+  if (daysAgo < 7) {
+    return date.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + timeStr
+  }
+  
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + timeStr
+  }
+  
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + ', ' + timeStr
+}
 
 // Extended Chat type for folder property
 interface ChatWithFolder extends Chat {
@@ -228,6 +259,11 @@ class AppStorage {
 function App() {
   type RightPanel = 'panel-chat' | 'panel-shortcuts' | 'panel-analytics'
   const [rightPanel, setRightPanel] = useState<RightPanel>('panel-chat')
+
+  // Scroll to bottom
+  const [showScrollButton, setShowScrollButton] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const chatInnerRef = useRef<HTMLDivElement>(null)
 
   // Message reactions
   const [messageReactions, setMessageReactions] = useState<{
@@ -878,6 +914,24 @@ function App() {
     setFolderSubmenuOpen(null)
   }
 
+  // Scroll to bottom functions
+  const scrollToBottom = (smooth = true) => {
+    if (chatInnerRef.current) {
+      chatInnerRef.current.scrollTo({
+        top: chatInnerRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto'
+      })
+      setUnreadCount(0)
+    }
+  }
+
+  const handleChatScroll = () => {
+    if (!chatInnerRef.current) return
+    const { scrollTop, scrollHeight, clientHeight } = chatInnerRef.current
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+    setShowScrollButton(distanceFromBottom > 200)
+  }
+
   // Chat context menu states
   const [folderSubmenuOpen, setFolderSubmenuOpen] = useState<string | null>(null)
   const [chatContextMenu, setChatContextMenu] = useState<{
@@ -957,6 +1011,34 @@ function App() {
     }
     loadData()
   }, [])
+
+  // Detect scroll for scroll-to-bottom button
+  useEffect(() => {
+    const chatInner = chatInnerRef.current
+    if (!chatInner) return
+
+    chatInner.addEventListener('scroll', handleChatScroll)
+    return () => chatInner.removeEventListener('scroll', handleChatScroll)
+  }, [activeChatId])
+
+  // Auto-scroll when new messages arrive
+  useEffect(() => {
+    if (!activeChatId) return
+    
+    const chatInner = chatInnerRef.current
+    if (!chatInner) return
+    
+    const { scrollTop, scrollHeight, clientHeight } = chatInner
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+    
+    // Auto-scroll if near bottom (within 100px)
+    if (distanceFromBottom < 100) {
+      scrollToBottom(false)
+    } else {
+      // Increment unread if scrolled up
+      setUnreadCount(prev => prev + 1)
+    }
+  }, [chats, activeChatId])
 
   // Load messages and reactions when active chat changes
   useEffect(() => {
@@ -1915,175 +1997,223 @@ function App() {
               </div>
               )}
               
-              <div className="chat-inner">
+              <div className="chat-inner" ref={chatInnerRef} onScroll={handleChatScroll}>
                 {activeChat ? (
                   <>
-                    {activeChat.messages.map((msg, index) => {
-                      const matchIndex = matchedMessages.findIndex(m => m.index === index)
-                      const isMatched = matchIndex !== -1
-                      const isCurrentMatch = isMatched && matchIndex === currentMatchIndex
-                      
-                      return (
-                        <div 
-                          key={msg.id}
-                          ref={(el) => {
-                            if (isMatched && el) {
-                              matchedMessageRefs.current[matchIndex] = el
-                            }
-                          }}
-                        >
-                          <div className={`msg-row ${msg.role}`}>
-                            <div className="msg-bubble">
-                              {msg.role === 'assistant' && <div className="msg-label">AI</div>}
-                              {msg.role === 'user' && <div className="msg-label">You</div>}
-                              
-                              {editingMessageId === msg.id ? (
-                                <div className="msg-edit-container">
-                                  <textarea
-                                    className="msg-edit-input"
-                                    value={editingMessageContent}
-                                    onChange={(e) => setEditingMessageContent(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault()
-                                        handleSaveEdit(msg.id, index)
-                                      }
-                                      if (e.key === 'Escape') {
-                                        handleCancelEdit()
-                                      }
-                                    }}
-                                    autoFocus
-                                    disabled={isTyping}
-                                  />
-                                  <div className="msg-edit-actions">
-                                    <button
-                                      className="msg-edit-save"
-                                      onClick={() => handleSaveEdit(msg.id, index)}
-                                      disabled={!editingMessageContent.trim() || isTyping}
-                                      title="Save and regenerate (Enter)"
-                                    >
-                                      <Check size={14} />
-                                      Save
-                                    </button>
-                                    <button
-                                      className="msg-edit-cancel"
-                                      onClick={handleCancelEdit}
-                                      disabled={isTyping}
-                                      title="Cancel (Esc)"
-                                    >
-                                      <X size={14} />
-                                      Cancel
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="msg-content">
-                                  {renderMessageContent(msg.content, isCurrentMatch)}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Action buttons for user messages */}
-                          {msg.role === 'user' && editingMessageId !== msg.id && (
-                            <div className="msg-actions">
-                              <button
-                                className="msg-action-btn"
-                                onClick={() => handleCopyMessage(msg.content)}
-                                title="Copy"
-                              >
-                                <Copy size={14} />
-                              </button>
-                              <button
-                                className="msg-action-btn"
-                                onClick={() => handleEditMessage(msg.id, msg.content)}
-                                title="Edit message"
-                                disabled={isTyping}
-                              >
-                                <Edit2 size={14} />
-                              </button>
-                            </div>
-                          )}
-                          
-                          {/* Action buttons for AI messages */}
-                          {msg.role === 'assistant' && (
-                            <div className="msg-actions">
-                              {/* Branch navigation */}
-                              {getBranchInfo(index) && (
-                                <>
-                                  <button
-                                    className="msg-action-btn"
-                                    onClick={() => handleSwitchBranch(index, 'prev')}
-                                    title="Previous branch"
-                                    disabled={isTyping}
-                                  >
-                                    <ChevronLeft size={14} />
-                                  </button>
-                                  <span className="branch-indicator">
-                                    {getBranchInfo(index)!.current}/{getBranchInfo(index)!.total}
-                                  </span>
-                                  <button
-                                    className="msg-action-btn"
-                                    onClick={() => handleSwitchBranch(index, 'next')}
-                                    title="Next branch"
-                                    disabled={isTyping}
-                                  >
-                                    <ChevronRight size={14} />
-                                  </button>
-                                  <button
-                                    className="msg-action-btn branch-delete-btn"
-                                    onClick={() => handleDeleteBranch(index)}
-                                    title="Delete current branch"
-                                    disabled={isTyping || getBranchInfo(index)!.total <= 1}
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                  <div className="action-divider"></div>
-                                </>
-                              )}
-                              
-                              <button
-                                className="msg-action-btn"
-                                onClick={() => handleCreateBranch(index)}
-                                title="Create alternate path from here"
-                                disabled={isTyping}
-                              >
-                                <GitBranch size={14} />
-                              </button>
-                              <button
-                                className="msg-action-btn"
-                                onClick={() => handleCopyMessage(msg.content)}
-                                title="Copy"
-                              >
-                                <Copy size={14} />
-                              </button>
-                              <button
-                                className={`msg-action-btn ${messageReactions[msg.id] === 'like' ? 'active-like' : ''}`}
-                                onClick={() => handleLikeMessage(msg.id)}
-                                title="Like"
-                              >
-                                <ThumbsUp size={14} />
-                              </button>
-                              <button
-                                className={`msg-action-btn ${messageReactions[msg.id] === 'dislike' ? 'active-dislike' : ''}`}
-                                onClick={() => handleDislikeMessage(msg.id)}
-                                title="Dislike"
-                              >
-                                <ThumbsDown size={14} />
-                              </button>
-                              <button
-                                className="msg-action-btn"
-                                onClick={() => handleRetryMessage(index)}
-                                title="Retry"
-                                disabled={isTyping}
-                              >
-                                <RotateCcw size={14} />
-                              </button>
-                            </div>
-                          )}
+                    {activeChat.messages.length === 0 ? (
+                      <div className="empty-state">
+                        <div className="empty-state-icon">
+                          <MessageSquare size={48} strokeWidth={1.5} />
                         </div>
-                      )
-                    })}
+                        
+                        <h2 className="empty-state-title">Start a Conversation</h2>
+                        <p className="empty-state-description">
+                          Ask me anything or use the shortcuts below to get started
+                        </p>
+                        
+                        <div className="empty-state-prompts">
+                          {[
+                            "Explain this code to me",
+                            "Help me debug this error",
+                            "Write a function to...",
+                            "What does this mean?",
+                          ].map((prompt, i) => (
+                            <button 
+                              key={i} 
+                              className="empty-state-prompt"
+                              onClick={() => setMessageInput(prompt)}
+                            >
+                              <Zap size={14} />
+                              {prompt}
+                            </button>
+                          ))}
+                        </div>
+                        
+                        <div className="empty-state-shortcuts">
+                          <div className="shortcut-hint">
+                            <Keyboard size={16} />
+                            <span>
+                              <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>E</kbd>
+                            </span>
+                            <span className="shortcut-label">Explain clipboard</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {activeChat.messages.map((msg, index) => {
+                        const matchIndex = matchedMessages.findIndex(m => m.index === index)
+                        const isMatched = matchIndex !== -1
+                        const isCurrentMatch = isMatched && matchIndex === currentMatchIndex
+                        
+                        return (
+                          <div 
+                            key={msg.id}
+                            ref={(el) => {
+                              if (isMatched && el) {
+                                matchedMessageRefs.current[matchIndex] = el
+                              }
+                            }}
+                          >
+                            <div className={`msg-row ${msg.role}`}>
+                              <div className="msg-bubble">
+                                {msg.role === 'assistant' && <div className="msg-label">AI</div>}
+                                {msg.role === 'user' && <div className="msg-label">You</div>}
+                                
+                                {editingMessageId === msg.id ? (
+                                  <div className="msg-edit-container">
+                                    <textarea
+                                      className="msg-edit-input"
+                                      value={editingMessageContent}
+                                      onChange={(e) => setEditingMessageContent(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                          e.preventDefault()
+                                          handleSaveEdit(msg.id, index)
+                                        }
+                                        if (e.key === 'Escape') {
+                                          handleCancelEdit()
+                                        }
+                                      }}
+                                      autoFocus
+                                      disabled={isTyping}
+                                    />
+                                    <div className="msg-edit-actions">
+                                      <button
+                                        className="msg-edit-save"
+                                        onClick={() => handleSaveEdit(msg.id, index)}
+                                        disabled={!editingMessageContent.trim() || isTyping}
+                                        title="Save and regenerate (Enter)"
+                                      >
+                                        <Check size={14} />
+                                        Save
+                                      </button>
+                                      <button
+                                        className="msg-edit-cancel"
+                                        onClick={handleCancelEdit}
+                                        disabled={isTyping}
+                                        title="Cancel (Esc)"
+                                      >
+                                        <X size={14} />
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="msg-content">
+                                      {renderMessageContent(msg.content, isCurrentMatch)}
+                                    </div>
+                                    <div className="msg-timestamp">
+                                      {formatTimestamp(msg.timestamp)}
+                                    </div>                                
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Action buttons for user messages */}
+                            {msg.role === 'user' && editingMessageId !== msg.id && (
+                              <div className="msg-actions">
+                                <button
+                                  className="msg-action-btn"
+                                  onClick={() => handleCopyMessage(msg.content)}
+                                  title="Copy"
+                                >
+                                  <Copy size={14} />
+                                </button>
+                                <button
+                                  className="msg-action-btn"
+                                  onClick={() => handleEditMessage(msg.id, msg.content)}
+                                  title="Edit message"
+                                  disabled={isTyping}
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                              </div>
+                            )}
+                            
+                            {/* Action buttons for AI messages */}
+                            {msg.role === 'assistant' && (
+                              <div className="msg-actions">
+                                {/* Branch navigation */}
+                                {getBranchInfo(index) && (
+                                  <>
+                                    <button
+                                      className="msg-action-btn"
+                                      onClick={() => handleSwitchBranch(index, 'prev')}
+                                      title="Previous branch"
+                                      disabled={isTyping}
+                                    >
+                                      <ChevronLeft size={14} />
+                                    </button>
+                                    <span className="branch-indicator">
+                                      {getBranchInfo(index)!.current}/{getBranchInfo(index)!.total}
+                                    </span>
+                                    <button
+                                      className="msg-action-btn"
+                                      onClick={() => handleSwitchBranch(index, 'next')}
+                                      title="Next branch"
+                                      disabled={isTyping}
+                                    >
+                                      <ChevronRight size={14} />
+                                    </button>
+                                    <button
+                                      className="msg-action-btn branch-delete-btn"
+                                      onClick={() => handleDeleteBranch(index)}
+                                      title="Delete current branch"
+                                      disabled={isTyping || getBranchInfo(index)!.total <= 1}
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                    <div className="action-divider"></div>
+                                  </>
+                                )}
+                                
+                                <button
+                                  className="msg-action-btn"
+                                  onClick={() => handleCreateBranch(index)}
+                                  title="Create alternate path from here"
+                                  disabled={isTyping}
+                                >
+                                  <GitBranch size={14} />
+                                </button>
+                                <button
+                                  className="msg-action-btn"
+                                  onClick={() => handleCopyMessage(msg.content)}
+                                  title="Copy"
+                                >
+                                  <Copy size={14} />
+                                </button>
+                                <button
+                                  className={`msg-action-btn ${messageReactions[msg.id] === 'like' ? 'active-like' : ''}`}
+                                  onClick={() => handleLikeMessage(msg.id)}
+                                  title="Like"
+                                >
+                                  <ThumbsUp size={14} />
+                                </button>
+                                <button
+                                  className={`msg-action-btn ${messageReactions[msg.id] === 'dislike' ? 'active-dislike' : ''}`}
+                                  onClick={() => handleDislikeMessage(msg.id)}
+                                  title="Dislike"
+                                >
+                                  <ThumbsDown size={14} />
+                                </button>
+                                <button
+                                  className="msg-action-btn"
+                                  onClick={() => handleRetryMessage(index)}
+                                  title="Retry"
+                                  disabled={isTyping}
+                                >
+                                  <RotateCcw size={14} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                      </>
+                    )}
                     {userIsTyping && (
                       <div className="typing-indicator user-typing">
                         <div className="typing-bubble user-typing-bubble">
@@ -2414,6 +2544,22 @@ function App() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Scroll to Bottom Button */}
+        {showScrollButton && activeChatId && (
+          <button 
+            className="scroll-to-bottom-btn"
+            onClick={() => scrollToBottom(true)}
+            title="Scroll to bottom"
+          >
+            <ArrowDown size={20} />
+            {unreadCount > 0 && (
+              <span className="unread-badge">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
         )}
       </div>
 
