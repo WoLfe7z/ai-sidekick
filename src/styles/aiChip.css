@@ -1,0 +1,376 @@
+/* ============================================
+   AI CHIP WITH ATOMIC ORBITS (REACT LOGO STYLE)
+   ============================================ */
+
+.ai-chip-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  position: relative;
+  width: 100%;
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+/* ============================================
+   CENTRAL AI CHIP
+   ============================================ */
+
+.ai-chip {
+  width: 100px;
+  height: 100px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-left: -50px;
+  margin-top: -50px;
+  transform-style: preserve-3d;
+  z-index: 10;
+}
+
+.chip-core {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+  border: 2px solid rgba(59, 130, 246, 0.4);
+  border-radius: 20px;
+  position: relative;
+  box-shadow: 
+    0 0 30px rgba(59, 130, 246, 0.3),
+    inset 0 0 40px rgba(59, 130, 246, 0.05),
+    0 0 60px rgba(139, 92, 246, 0.2);
+  animation: chipPulse 3s ease-in-out infinite;
+}
+
+/* Ripple waves from chip - on chip-core for proper centering */
+.chip-core::before {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  background-image: 
+    repeating-linear-gradient(90deg, transparent, transparent 8px, rgba(59, 130, 246, 0.15) 8px, rgba(59, 130, 246, 0.15) 9px),
+    repeating-linear-gradient(0deg, transparent, transparent 8px, rgba(59, 130, 246, 0.15) 8px, rgba(59, 130, 246, 0.15) 9px);
+  border-radius: 15px;
+  opacity: 0.5;
+}
+
+/* Ripple 1 - use a wrapper div approach instead */
+
+/* Ripple waves - actual divs inside chip */
+.ripple {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid rgba(59, 130, 246, 0.15);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 15;
+  animation: ripple 8s ease-out infinite;
+}
+
+.ripple-2 {
+  animation-delay: 8s;
+  border-color: rgba(139, 92, 246, 0.12);
+}
+
+@keyframes ripple {
+  0% {
+    width: 100px;
+    height: 100px;
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  100% {
+    width: 350px;
+    height: 350px;
+    opacity: 0;
+  }
+}
+
+.chip-core::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.6) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: coreGlow 2s ease-in-out infinite;
+}
+
+@keyframes chipPulse {
+  0%, 100% {
+    box-shadow: 
+      0 0 20px rgba(59, 130, 246, 0.2),
+      inset 0 0 30px rgba(59, 130, 246, 0.05),
+      0 0 40px rgba(139, 92, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 
+      0 0 50px rgba(59, 130, 246, 0.5),
+      inset 0 0 50px rgba(59, 130, 246, 0.15),
+      0 0 100px rgba(139, 92, 246, 0.4);
+    border-color: rgba(59, 130, 246, 0.7);
+  }
+}
+
+@keyframes coreGlow {
+  0%, 100% {
+    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.3);
+  }
+}
+
+/* ============================================
+   ORBIT SYSTEM
+   ============================================ */
+
+.orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+/* Orbit path with NEON GLOW */
+.orbit-path {
+  position: relative;
+  width: 340px;
+  height: 180px;
+  margin-left: -170px;
+  margin-top: -90px;
+  border: 2px solid rgba(59, 130, 246, 0.6);
+  border-radius: 50%;
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 0 8px currentColor);
+  animation: orbitGlow 3s ease-in-out infinite;
+}
+
+@keyframes orbitGlow {
+  0%, 100% {
+    opacity: 0.6;
+    filter: drop-shadow(0 0 4px currentColor);
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 12px currentColor);
+  }
+}
+
+.orbit-1 .orbit-path {
+  transform: rotateX(10deg) rotateZ(0deg);
+  border-color: rgba(59, 130, 246, 0.6);
+  color: rgba(59, 130, 246, 0.8);
+}
+
+.orbit-2 .orbit-path {
+  transform: rotateX(10deg) rotateZ(60deg);
+  border-color: rgba(139, 92, 246, 0.6);
+  color: rgba(139, 92, 246, 0.8);
+  animation-delay: -1s;
+}
+
+.orbit-3 .orbit-path {
+  transform: rotateX(10deg) rotateZ(120deg);
+  border-color: rgba(236, 72, 153, 0.6);
+  color: rgba(236, 72, 153, 0.8);
+  animation-delay: -2s;
+}
+
+/* ============================================
+   PARTICLES with GHOST TRAIL
+   ============================================ */
+
+.particle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  left: 0;
+  top: 0;
+  transform-style: flat;
+  /* Initial transform - will be overridden by JS */
+  transform: rotateX(-10deg) translate(-50%, -50%);
+  /* Smooth transitions */
+  transition: none;
+}
+
+/* Ghost trail - multiple blurred copies */
+.particle::before,
+.particle::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  background: inherit;
+  pointer-events: none;
+}
+
+/* First ghost - closer */
+.particle::before {
+  filter: blur(3px);
+  opacity: 0.3;
+  transform: scale(1.3);
+}
+
+/* Second ghost - farther */
+.particle::after {
+  filter: blur(6px);
+  opacity: 0.15;
+  transform: scale(1.8);
+  animation: ghostPulse 2s ease-in-out infinite;
+}
+
+@keyframes ghostPulse {
+  0%, 100% {
+    opacity: 0.1;
+    transform: scale(1.8);
+  }
+  50% {
+    opacity: 0.2;
+    transform: scale(2.2);
+  }
+}
+
+/* Particle 1 - Blue */
+.particle-1 {
+  background: radial-gradient(circle, rgba(59, 130, 246, 1) 0%, rgba(59, 130, 246, 0.6) 50%, rgba(59, 130, 246, 0) 100%);
+  box-shadow: 
+    0 0 15px rgba(59, 130, 246, 1),
+    0 0 30px rgba(59, 130, 246, 0.8),
+    0 0 45px rgba(59, 130, 246, 0.5);
+  animation: particlePulse1 2s ease-in-out infinite;
+}
+
+/* Particle 2 - Purple */
+.particle-2 {
+  background: radial-gradient(circle, rgba(139, 92, 246, 1) 0%, rgba(139, 92, 246, 0.6) 50%, rgba(139, 92, 246, 0) 100%);
+  box-shadow: 
+    0 0 15px rgba(139, 92, 246, 1),
+    0 0 30px rgba(139, 92, 246, 0.8),
+    0 0 45px rgba(139, 92, 246, 0.5);
+  animation: particlePulse2 2s ease-in-out infinite;
+  animation-delay: -0.66s;
+}
+
+/* Particle 3 - Pink */
+.particle-3 {
+  background: radial-gradient(circle, rgba(236, 72, 153, 1) 0%, rgba(236, 72, 153, 0.6) 50%, rgba(236, 72, 153, 0) 100%);
+  box-shadow: 
+    0 0 15px rgba(236, 72, 153, 1),
+    0 0 30px rgba(236, 72, 153, 0.8),
+    0 0 45px rgba(236, 72, 153, 0.5);
+  animation: particlePulse3 2s ease-in-out infinite;
+  animation-delay: -1.33s;
+}
+
+@keyframes particlePulse1 {
+  0%, 100% {
+    box-shadow: 
+      0 0 15px rgba(59, 130, 246, 1),
+      0 0 30px rgba(59, 130, 246, 0.8),
+      0 0 45px rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    box-shadow: 
+      0 0 20px rgba(59, 130, 246, 1),
+      0 0 40px rgba(59, 130, 246, 1),
+      0 0 60px rgba(59, 130, 246, 0.8);
+  }
+}
+
+@keyframes particlePulse2 {
+  0%, 100% {
+    box-shadow: 
+      0 0 15px rgba(139, 92, 246, 1),
+      0 0 30px rgba(139, 92, 246, 0.8),
+      0 0 45px rgba(139, 92, 246, 0.5);
+  }
+  50% {
+    box-shadow: 
+      0 0 20px rgba(139, 92, 246, 1),
+      0 0 40px rgba(139, 92, 246, 1),
+      0 0 60px rgba(139, 92, 246, 0.8);
+  }
+}
+
+@keyframes particlePulse3 {
+  0%, 100% {
+    box-shadow: 
+      0 0 15px rgba(236, 72, 153, 1),
+      0 0 30px rgba(236, 72, 153, 0.8),
+      0 0 45px rgba(236, 72, 153, 0.5);
+  }
+  50% {
+    box-shadow: 
+      0 0 20px rgba(236, 72, 153, 1),
+      0 0 40px rgba(236, 72, 153, 1),
+      0 0 60px rgba(236, 72, 153, 0.8);
+  }
+}
+
+/* ============================================
+   TEXT
+   ============================================ */
+
+.ai-chip-text {
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.8px;
+  position: absolute;
+  bottom: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  white-space: nowrap;
+  
+  /* Simple color with glow */
+  color: rgba(156, 163, 175, 0.8);
+  text-shadow: 
+    0 0 10px rgba(96, 165, 250, 0.4),
+    0 0 20px rgba(96, 165, 250, 0.2);
+  
+  /* Pulsing animation */
+  animation: textFade 3s ease-in-out infinite;
+}
+
+/* Pulsing fade */
+@keyframes textFade {
+  0%, 100% {
+    opacity: 0.7;
+    text-shadow: 
+      0 0 8px rgba(96, 165, 250, 0.3),
+      0 0 16px rgba(96, 165, 250, 0.15);
+  }
+  50% {
+    opacity: 1;
+    text-shadow: 
+      0 0 15px rgba(96, 165, 250, 0.6),
+      0 0 30px rgba(96, 165, 250, 0.3);
+  }
+}
+
+.chat-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+}

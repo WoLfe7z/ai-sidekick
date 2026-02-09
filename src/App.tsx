@@ -14,6 +14,10 @@ import './styles/code-highlight.css'
 import './styles/markdown.css'
 import './styles/folders.css'
 import './styles/exportModal.css'
+import './styles/aiChip.css'
+
+// AI chip animation
+import { AIChipLoader } from './components/aiChipLoader'
 
 // Chat history
 import { Chat, Message } from './types/chat'
@@ -2276,7 +2280,7 @@ function App() {
                     )}
                   </>
                 ) : (
-                  <div className="chat-empty">Select a chat</div>
+                  <AIChipLoader />
                 )}
               </div>
             </div>
