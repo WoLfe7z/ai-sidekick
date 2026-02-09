@@ -519,6 +519,36 @@ mark.search-highlight.current {
   line-height: 1.5;
 }
 
+/* Select a chat state - reuse empty-state styles */
+.chat-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+.chat-empty::before {
+  content: '💬';
+  font-size: 4rem;
+  margin-bottom: 24px;
+  opacity: 0.3;
+  display: block;
+}
+
+.chat-empty::after {
+  content: 'Choose a conversation from the sidebar or start a new one';
+  display: block;
+  font-size: 0.9rem;
+  color: #4b5563;
+  margin-top: 12px;
+  max-width: 300px;
+}
+
 .empty-state-prompts {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
